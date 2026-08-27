@@ -5,18 +5,21 @@ import {
   ComposableMap,
   Geographies,
   Geography,
+  ZoomableGroup,
 } from "react-simple-maps";
 
 const GEO_URL =
-  "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
+  "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json";
 
-export interface CountryPetrolPrice {
+export interface CountryFuelData {
   countryName: string;
-  price: number;
+  petrol: number | null;
+  diesel: number | null;
 }
 
 interface Props {
-  prices: CountryPetrolPrice[];
+  prices: CountryFuelData[];
+  euAveragePetrol: number | null;
 }
 
 function interpolateColor(t: number): string {
@@ -28,14 +31,16 @@ function interpolateColor(t: number): string {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
-export default function EuropeFuelMap({ prices }: Props) {
-  const [hovered, setHovered] = useState<CountryPetrolPrice | null>(null);
+export default function EuropeFuelMap({ prices, euAveragePetrol }: Props) {
+  const [hovered, setHovered] = useState<CountryFuelData | null>(null);
 
-  const priceByCountry = new Map(prices.map((p) => [p.countryName, p.price]));
+  const dataByCountry = new Map(prices.map((p) => [p.countryName, p]));
 
-  const values = prices.map((p) => p.price);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
+  const petrolValues = prices
+    .map((p) => p.petrol)
+    .filter((v): v is number => v !== null);
+  const min = Math.min(...petrolValues);
+  const max = Math.max(...petrolValues);
 
   return (
     <div className="relative">
@@ -46,68 +51,97 @@ export default function EuropeFuelMap({ prices }: Props) {
         height={520}
         style={{ width: "100%", height: "auto" }}
       >
-        <Geographies geography={GEO_URL}>
-          {({ geographies }) =>
-            geographies.map((geo) => {
-              const name = geo.properties.name as string;
-              const price = priceByCountry.get(name);
-              const t = price !== undefined && max > min
-                ? (price - min) / (max - min)
-                : null;
+        <ZoomableGroup center={[0, 0]} zoom={1} minZoom={1} maxZoom={5}>
+          <Geographies geography={GEO_URL}>
+            {({ geographies }) =>
+              geographies.map((geo) => {
+                const name = geo.properties.name as string;
+                const data = dataByCountry.get(name);
+                const t =
+                  data?.petrol !== undefined &&
+                  data?.petrol !== null &&
+                  max > min
+                    ? (data.petrol - min) / (max - min)
+                    : null;
 
-              return (
-                <Geography
-                  key={geo.rsmKey}
-                  geography={geo}
-                  onMouseEnter={() => {
-                    if (price !== undefined) setHovered({ countryName: name, price });
-                  }}
-                  onMouseLeave={() => setHovered(null)}
-                  style={{
-                    default: {
-                      fill: t !== null ? interpolateColor(t) : "#eef0f3",
-                      stroke: "#ffffff",
-                      strokeWidth: 0.5,
-                      outline: "none",
-                    },
-                    hover: {
-                      fill: t !== null ? interpolateColor(t) : "#eef0f3",
-                      stroke: "#14181f",
-                      strokeWidth: 1,
-                      outline: "none",
-                      cursor: price !== undefined ? "pointer" : "default",
-                    },
-                    pressed: {
-                      fill: t !== null ? interpolateColor(t) : "#eef0f3",
-                      outline: "none",
-                    },
-                  }}
-                />
-              );
-            })
-          }
-        </Geographies>
+                return (
+                  <Geography
+                    key={geo.rsmKey}
+                    geography={geo}
+                    onMouseEnter={() => {
+                      if (data) setHovered(data);
+                    }}
+                    onMouseLeave={() => setHovered(null)}
+                    style={{
+                      default: {
+                        fill: t !== null ? interpolateColor(t) : "#eef0f3",
+                        stroke: "#ffffff",
+                        strokeWidth: 0.5,
+                        outline: "none",
+                      },
+                      hover: {
+                        fill: t !== null ? interpolateColor(t) : "#eef0f3",
+                        stroke: "#14181f",
+                        strokeWidth: 1,
+                        outline: "none",
+                        cursor: data ? "pointer" : "default",
+                      },
+                      pressed: {
+                        fill: t !== null ? interpolateColor(t) : "#eef0f3",
+                        outline: "none",
+                      },
+                    }}
+                  />
+                );
+              })
+            }
+          </Geographies>
+        </ZoomableGroup>
       </ComposableMap>
 
       {hovered && (
-        <div className="pointer-events-none absolute left-4 top-4 rounded-md border border-[#dde1e7] bg-white px-3 py-2 text-sm shadow-sm">
+        <div className="pointer-events-none absolute left-4 top-4 rounded-md border border-[#dde1e7] bg-white px-3 py-2 text-sm shadow-md">
           <div className="font-medium">{hovered.countryName}</div>
-          <div className="font-mono tabular-nums text-[#5b6472]">
-            {hovered.price.toFixed(3)} EUR/L
-          </div>
+          {hovered.petrol !== null && (
+            <div className="mt-1 flex items-center justify-between gap-4">
+              <span className="text-xs text-[#8891a0]">Benzina</span>
+              <span className="font-mono tabular-nums">
+                {hovered.petrol.toFixed(3)} €/L
+              </span>
+            </div>
+          )}
+          {hovered.diesel !== null && (
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-xs text-[#8891a0]">Diesel</span>
+              <span className="font-mono tabular-nums">
+                {hovered.diesel.toFixed(3)} €/L
+              </span>
+            </div>
+          )}
+          {hovered.petrol !== null && euAveragePetrol !== null && (
+            <div className="mt-1 border-t border-[#eef0f3] pt-1 text-xs text-[#8891a0]">
+              {hovered.petrol > euAveragePetrol ? "+" : ""}
+              {((hovered.petrol - euAveragePetrol) * 1000).toFixed(0)}{" "}
+              millesimi vs media UE
+            </div>
+          )}
         </div>
       )}
 
       <div className="mt-3 flex items-center gap-2 text-xs text-[#8891a0]">
-        <span>Meno caro</span>
+        <span className="font-mono">{min.toFixed(2)} €/L</span>
         <div
           className="h-2 flex-1 rounded-full"
           style={{
             background: `linear-gradient(to right, ${interpolateColor(0)}, ${interpolateColor(1)})`,
           }}
         />
-        <span>Più caro</span>
+        <span className="font-mono">{max.toFixed(2)} €/L</span>
       </div>
+      <p className="mt-2 text-xs text-[#8891a0]">
+        Scorri con la rotellina per ingrandire, trascina per spostarti.
+        Passa il mouse su un paese per i dettagli.
+      </p>
     </div>
   );
 }

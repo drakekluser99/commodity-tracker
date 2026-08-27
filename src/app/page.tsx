@@ -59,9 +59,16 @@ export default async function Home() {
     fuelsByContinent.set(fuel.continent, list);
   }
 
-  const europeanPetrolPrices = (fuelsByContinent.get("europe") ?? [])
-    .filter((f) => f.fuelType === "petrol")
-    .map((f) => ({ countryName: f.regionName, price: parseFloat(f.price) }));
+  const europeFuelsByCountry = new Map<string, { petrol: number | null; diesel: number | null }>();
+  for (const f of fuelsByContinent.get("europe") ?? []) {
+    const existing = europeFuelsByCountry.get(f.regionName) ?? { petrol: null, diesel: null };
+    if (f.fuelType === "petrol") existing.petrol = parseFloat(f.price);
+    if (f.fuelType === "diesel") existing.diesel = parseFloat(f.price);
+    europeFuelsByCountry.set(f.regionName, existing);
+  }
+  const europeanFuelData = Array.from(europeFuelsByCountry.entries()).map(
+    ([countryName, data]) => ({ countryName, ...data })
+  );
 
   function average(values: number[]): number | null {
     if (values.length === 0) return null;
@@ -152,11 +159,11 @@ export default async function Home() {
       </header>
 
       <main className="mx-auto max-w-5xl px-6 py-10">
-        {europeanPetrolPrices.length > 0 && (
+        {europeanFuelData.length > 0 && (
           <section id="mappa" className="scroll-mt-8">
             <h2 className="text-lg font-semibold">Prezzo benzina in Europa</h2>
             <div className="mt-4 rounded-lg border border-[#dde1e7] bg-white p-4">
-              <EuropeFuelMap prices={europeanPetrolPrices} />
+              <EuropeFuelMap prices={europeanFuelData} euAveragePetrol={europeAverage.petrol} />
             </div>
             <SourceNote>
               Fonte: Bollettino Petrolifero Settimanale, Commissione Europea ·
