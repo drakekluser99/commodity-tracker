@@ -12,6 +12,36 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/*
+ * Palette "system-style": restyling estetico bianco/nero ispirato a un
+ * portfolio minimale con card dagli angoli a mirino (corner bracket).
+ *
+ * Perché qui e non in un tailwind.config.ts: questo progetto usa Tailwind
+ * v4, che NON ha più il file di config JS/TS — i token di tema si
+ * dichiarano come custom property dentro @theme in questo CSS. Ogni
+ * `--color-system-*` genera automaticamente le utility `bg-system-*`,
+ * `text-system-*`, `border-system-*`.
+ *
+ * Perché affiancata e non sostitutiva: i vecchi colori (usati come valori
+ * arbitrari `[#f7f8fa]` sparsi nei componenti) restano validi. Migriamo
+ * gradualmente sezione per sezione, senza un big-bang che rischia
+ * regressioni visive difficili da revisionare.
+ *
+ * `accent` = stesso verde petrolio già in uso (#0f6b66): continuità di
+ * brand. `accent-down` = ruggine invece del rosso semaforico da app di
+ * trading, per restare nel tema "materie prime / terra".
+ */
+@theme {
+  --color-system-bg: #fafafa;
+  --color-system-panel: #f2f3f5;
+  --color-system-ink: #111318;
+  --color-system-ink-muted: #6b7280;
+  --color-system-border: #e2e4e9;
+  --color-system-border-strong: #111318;
+  --color-system-accent: #0f6b66;
+  --color-system-accent-down: #b34324;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;

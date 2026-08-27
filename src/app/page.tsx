@@ -2,8 +2,9 @@ import { getLatestCommodityPrices, getLatestFuelPrices } from "@/lib/db/queries"
 import EuropeFuelMap from "@/components/EuropeFuelMap";
 import FuelImpactCalculator from "@/components/FuelImpactCalculator";
 import MobileNav from "@/components/MobileNav";
+import { StatusLabel } from "@/components/StatusLabel";
 import Link from "next/link";
-import { Code2, Clock, Fuel, Globe2, Calculator, BarChart3 } from "lucide-react";
+import { Code2, Fuel, Globe2, Calculator, BarChart3 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -144,9 +145,15 @@ export default async function Home() {
           </div>
 
           {lastUpdated && (
-            <div className="mt-4 flex items-center gap-1.5 text-xs text-[#8891a0]">
-              <Clock size={13} />
-              Ultimo aggiornamento: {formatDateTime(lastUpdated)}
+            // Ex "Ultimo aggiornamento: ...": ora un'etichetta system-style
+            // con pallino di stato. `live` perché il dato è aggiornato di
+            // recente via cron; il valore resta la data formattata in italiano.
+            <div className="mt-4">
+              <StatusLabel
+                label="MARKET DATA"
+                value={formatDateTime(lastUpdated)}
+                live
+              />
             </div>
           )}
 
@@ -201,7 +208,9 @@ export default async function Home() {
             <div className="mt-4 overflow-x-auto rounded-lg border border-[#dde1e7] bg-white">
               <table className="w-full min-w-[480px] text-sm">
                 <thead>
-                  <tr className="border-b border-[#dde1e7] text-left text-xs uppercase tracking-wide text-[#5b6472]">
+                  {/* Intestazioni in stile terminale: monospace + maiuscolo
+                      spaziato, per coerenza con le card system-style. */}
+                  <tr className="border-b border-[#dde1e7] text-left font-mono text-xs uppercase tracking-wider text-[#5b6472]">
                     <th className="px-4 py-3 font-medium">Materia prima</th>
                     <th className="px-4 py-3 font-medium">Categoria</th>
                     <th className="px-4 py-3 text-right font-medium">Prezzo</th>
@@ -250,7 +259,9 @@ export default async function Home() {
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-[480px] text-sm">
                       <thead>
-                        <tr className="border-b border-[#dde1e7] text-left text-xs uppercase tracking-wide text-[#5b6472]">
+                        {/* Intestazioni in stile terminale: monospace + maiuscolo
+                      spaziato, per coerenza con le card system-style. */}
+                  <tr className="border-b border-[#dde1e7] text-left font-mono text-xs uppercase tracking-wider text-[#5b6472]">
                           <th className="px-4 py-3 font-medium">Regione</th>
                           <th className="px-4 py-3 font-medium">Carburante</th>
                           <th className="px-4 py-3 text-right font-medium">Prezzo / litro</th>
@@ -356,8 +367,14 @@ export default async function Home() {
 }
 
 function SourceNote({ children }: { children: React.ReactNode }) {
+  // Il CONTENUTO della nota resta identico (è il principio cardine del
+  // progetto: ogni dato con la sua fonte). Cambia solo lo stile: monospace
+  // maiuscolo spaziato, in tinta con l'estetica system-style. `uppercase`
+  // è puramente presentazionale, il testo nel DOM non cambia.
   return (
-    <p className="mt-2 text-xs text-[#8891a0]">{children}</p>
+    <p className="mt-2 font-mono text-xs uppercase tracking-wider text-system-ink-muted">
+      {children}
+    </p>
   );
 }
 

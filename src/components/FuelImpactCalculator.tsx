@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Car, Truck } from "lucide-react";
+import { SystemCard } from "@/components/SystemCard";
 
 export interface RegionFuelAverage {
   petrol: number | null;
@@ -41,9 +42,11 @@ export default function FuelImpactCalculator({ europe, us }: Props) {
   const tank = useNumericField(DEFAULT_CAR_TANK_LITERS);
   const truck = useNumericField(DEFAULT_TRUCK_CONSUMPTION);
 
+  // `eyebrow` in stile "REGIONE://" — l'estetica system-style vuole
+  // un'etichetta tipo path/terminale sopra ogni card di sintesi.
   const regions = [
-    { label: "Europa (media UE)", data: europe },
-    { label: "Stati Uniti", data: us },
+    { label: "Europa (media UE)", eyebrow: "EUROPE://", data: europe },
+    { label: "Stati Uniti", eyebrow: "US://", data: us },
   ];
 
   return (
@@ -80,13 +83,9 @@ export default function FuelImpactCalculator({ europe, us }: Props) {
       </div>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        {regions.map(({ label, data }) => (
-          <div
-            key={label}
-            className="rounded-lg border border-[#eef0f3] bg-[#f7f8fa] p-4"
-          >
-            <div className="text-sm font-semibold">{label}</div>
-            <div className="mt-0.5 text-xs text-[#8891a0]">
+        {regions.map(({ label, eyebrow, data }) => (
+          <SystemCard key={label} eyebrow={eyebrow} title={label}>
+            <div className="text-xs text-system-ink-muted">
               {data.petrol !== null && (
                 <>Benzina {formatPricePerLiter(data.petrol, data.currency)}</>
               )}
@@ -117,7 +116,7 @@ export default function FuelImpactCalculator({ europe, us }: Props) {
                   : "—"}
               </span>
             </div>
-          </div>
+          </SystemCard>
         ))}
       </div>
 
