@@ -283,25 +283,63 @@ export default async function Home() {
         </section>
       </main>
 
-      <footer className="border-t border-[#dde1e7] bg-white">
-        <div className="mx-auto max-w-5xl px-6 py-8">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <p className="text-xs text-[#8891a0]">
-              Progetto open source · dati pubblici, nessuna garanzia di
-              accuratezza
-            </p>
-            <div className="flex gap-4 text-xs">
-              <Link href="/metodologia" className="text-[#0f6b66] hover:underline">
-                Metodologia
-              </Link>
-              <a
-                href={GITHUB_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[#0f6b66] hover:underline"
-              >
-                GitHub
-              </a>
+      <footer className="relative mt-8 rounded-t-4xl border-t border-[#dde1e7] bg-white">
+        <div className="absolute left-1/2 right-1/2 top-0 h-px w-1/3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-r from-transparent via-[#0f6b66]/30 to-transparent blur-[1px]" />
+
+        <div className="mx-auto max-w-5xl px-6 py-12">
+          <div className="grid gap-8 sm:grid-cols-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0f6b66]">
+                Commodity Tracker
+              </p>
+              <p className="mt-3 text-xs leading-relaxed text-[#8891a0]">
+                Progetto open source · dati pubblici, nessuna garanzia di
+                accuratezza
+              </p>
+            </div>
+
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-[#5b6472]">
+                Naviga
+              </h3>
+              <ul className="mt-3 space-y-2 text-sm">
+                {NAV_ITEMS.map(({ href, label }) => (
+                  <li key={href}>
+                    <a
+                      href={href}
+                      className="text-[#5b6472] transition-colors hover:text-[#0f6b66]"
+                    >
+                      {label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-[#5b6472]">
+                Progetto
+              </h3>
+              <ul className="mt-3 space-y-2 text-sm">
+                <li>
+                  <Link
+                    href="/metodologia"
+                    className="text-[#5b6472] transition-colors hover:text-[#0f6b66]"
+                  >
+                    Metodologia
+                  </Link>
+                </li>
+                <li>
+                  <a
+                    href={GITHUB_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[#5b6472] transition-colors hover:text-[#0f6b66]"
+                  >
+                    Codice sorgente
+                  </a>
+                </li>
+              </ul>
             </div>
           </div>
         </div>
