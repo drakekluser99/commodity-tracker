@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/fetch-market-prices-b",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/fetch-eu-fuel-prices",
+      "schedule": "0 12 * * 4"
     }
   ]
 }

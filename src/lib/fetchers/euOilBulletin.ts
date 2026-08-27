@@ -30,6 +30,20 @@ export interface EuFuelPricePoint {
  * ambiente con accesso di rete completo, e aggiustato se necessario.
  * Vedi scripts/inspect-eu-bulletin.ts.
  */
+/**
+ * NOTA: struttura confermata il 27/08/2026 eseguendo scripts/inspect-eu-bulletin.ts
+ * contro il file reale. Layout osservato:
+ *   Riga 1 = intestazioni prodotto (es. "Euro-super 95 (I)", "...Automotive
+ *            gas oil...", "...Heating gas oil...", "GPL...")
+ *   Riga 2 = data del bollettino (colonna 1) + unità di misura per colonna
+ *            ("1000 l" per benzina/diesel/riscaldamento/GPL, "t" per olio
+ *            combustibile pesante)
+ *   Riga 3+ = una riga per paese; colonna 1 = nome paese, colonne successive
+ *             = prezzi. Alcuni paesi hanno celle vuote per prodotti che non
+ *             riportano (es. Austria non ha dati su olio combustibile/GPL).
+ * I prezzi sono espressi per 1000 litri, non per litro: vanno divisi per
+ * 1000 prima di salvarli come "prezzo al litro".
+ */
 export async function fetchEuFuelPrices(): Promise<EuFuelPricePoint[]> {
   const res = await fetch(EU_OIL_BULLETIN_URL);
   if (!res.ok) {
@@ -48,37 +62,46 @@ export async function fetchEuFuelPrices(): Promise<EuFuelPricePoint[]> {
   return parseSheet(sheet);
 }
 
-function parseSheet(sheet: ExcelJS.Worksheet): EuFuelPricePoint[] {
-  // Il file della Commissione ha righe di intestazione non standard
-  // (a volte su più righe, con celle unite). Cerchiamo la riga che
-  // contiene qualcosa che assomiglia a un nome di paese nella prima
-  // colonna: da lì in poi consideriamo che iniziano i dati.
+export function parseSheet(sheet: ExcelJS.Worksheet): EuFuelPricePoint[] {
   const countryNames = new Set(EU_COUNTRIES);
+
+  // Passo 1: la riga di intestazione (prodotti) va cercata esplicitamente,
+  // NON assunta come "quella subito sopra i dati" — nel file reale c'è una
+  // riga di unità/data in mezzo tra intestazione e primo paese.
   let headerRowNumber: number | null = null;
-  let dataStartRow: number | null = null;
-
+  let unitsRowNumber: number | null = null;
   sheet.eachRow((row, rowNumber) => {
-    if (dataStartRow !== null) return; // già trovato, non serve continuare
-
-    const firstCell = String(row.getCell(1).value ?? "").trim();
-    if (countryNames.has(firstCell)) {
-      dataStartRow = rowNumber;
-      headerRowNumber = rowNumber - 1; // assumiamo l'intestazione nella riga precedente
+    if (headerRowNumber !== null || rowNumber > 5) return; // cerchiamo solo nelle prime righe
+    const hasPetrolLabel = findColumnByPattern(row, /euro.?super.?95/i);
+    if (hasPetrolLabel) {
+      headerRowNumber = rowNumber;
+      unitsRowNumber = rowNumber + 1;
     }
   });
 
-  if (dataStartRow === null || headerRowNumber === null) {
+  let dataStartRow: number | null = null;
+  sheet.eachRow((row, rowNumber) => {
+    if (dataStartRow !== null) return;
+    const firstCell = String(row.getCell(1).value ?? "").trim();
+    if (countryNames.has(firstCell)) dataStartRow = rowNumber;
+  });
+
+  if (headerRowNumber === null || dataStartRow === null) {
     throw new Error(
-      "Impossibile individuare l'inizio dei dati nel foglio: nessun nome di paese riconosciuto nella prima colonna. Il formato del file potrebbe essere cambiato — vedi scripts/inspect-eu-bulletin.ts per ispezionarlo."
+      "Impossibile individuare intestazione o inizio dati nel foglio. Il formato del file potrebbe essere cambiato — rilancia scripts/inspect-eu-bulletin.ts per verificare."
     );
   }
 
-  // Troviamo le colonne "Euro-super 95" (benzina) e "Automotive gas oil"
-  // / "Diesel" cercando il testo nell'intestazione, invece di assumere
-  // un indice fisso di colonna.
   const headerRow = sheet.getRow(headerRowNumber);
   const petrolColumn = findColumnByPattern(headerRow, /euro.?super.?95/i);
-  const dieselColumn = findColumnByPattern(headerRow, /diesel|gas.?oil/i);
+  // Pattern specifico "automotive gas oil" / "dieselkraftstoff": la colonna
+  // del gasolio da riscaldamento contiene anch'essa la parola "gas oil"
+  // ("Heating gas oil"), quindi un pattern generico /gas.?oil/ la
+  // confonderebbe con quella del diesel.
+  const dieselColumn = findColumnByPattern(
+    headerRow,
+    /automotive gas oil|dieselkraftstoff/i
+  );
 
   if (!petrolColumn || !dieselColumn) {
     throw new Error(
@@ -86,34 +109,46 @@ function parseSheet(sheet: ExcelJS.Worksheet): EuFuelPricePoint[] {
     );
   }
 
+  // La data del bollettino è nella riga delle unità, colonna 1
+  // (es. "2026-08-24T00:00:00.000Z"). La leggiamo dinamicamente invece
+  // di usare la data odierna: il bollettino potrebbe non essere ancora
+  // stato aggiornato quando il cron gira.
+  const rawDate = unitsRowNumber
+    ? sheet.getRow(unitsRowNumber).getCell(1).value
+    : null;
+  const bulletinDate = rawDate
+    ? new Date(rawDate as string).toISOString().slice(0, 10)
+    : new Date().toISOString().slice(0, 10);
+
   const results: EuFuelPricePoint[] = [];
-  const today = new Date().toISOString().slice(0, 10);
 
   sheet.eachRow((row, rowNumber) => {
     if (rowNumber < dataStartRow!) return;
 
     const countryName = String(row.getCell(1).value ?? "").trim();
-    if (!countryNames.has(countryName)) return; // riga non di dati (es. media UE, note a fondo pagina)
+    if (!countryNames.has(countryName)) return;
 
-    const petrolPrice = parsePriceCell(row.getCell(petrolColumn));
-    const dieselPrice = parsePriceCell(row.getCell(dieselColumn));
+    // Prezzi nel file sono per 1000 litri: dividiamo per ottenere il
+    // prezzo per litro, l'unità che usiamo in tutto il resto del progetto.
+    const petrolRaw = parsePriceCell(row.getCell(petrolColumn));
+    const dieselRaw = parsePriceCell(row.getCell(dieselColumn));
 
-    if (petrolPrice !== null) {
+    if (petrolRaw !== null) {
       results.push({
         countryName,
         fuelType: "petrol",
-        pricePerLiter: petrolPrice,
+        pricePerLiter: petrolRaw / 1000,
         currency: "EUR",
-        date: today,
+        date: bulletinDate,
       });
     }
-    if (dieselPrice !== null) {
+    if (dieselRaw !== null) {
       results.push({
         countryName,
         fuelType: "diesel",
-        pricePerLiter: dieselPrice,
+        pricePerLiter: dieselRaw / 1000,
         currency: "EUR",
-        date: today,
+        date: bulletinDate,
       });
     }
   });
