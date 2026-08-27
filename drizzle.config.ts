@@ -1,4 +1,6 @@
 import { defineConfig } from "drizzle-kit";
+import { config } from "dotenv";
+config({ path: ".env.local" });
 
 // Questo file NON viene eseguito dall'app in produzione: serve solo
 // al comando `drizzle-kit` (npm run db:generate / db:migrate) per sapere
