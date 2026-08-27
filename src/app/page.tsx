@@ -1,6 +1,7 @@
 import { getLatestCommodityPrices, getLatestFuelPrices } from "@/lib/db/queries";
 import EuropeFuelMap from "@/components/EuropeFuelMap";
 import FuelImpactCalculator from "@/components/FuelImpactCalculator";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -212,6 +213,10 @@ export default async function Home() {
 
       <footer className="mx-auto max-w-5xl px-6 py-10 text-xs text-[#8891a0]">
         Progetto open source · dati pubblici, nessuna garanzia di accuratezza
+        {" · "}
+        <Link href="/metodologia" className="text-[#0f6b66] hover:underline">
+          Metodologia
+        </Link>
       </footer>
     </div>
   );
