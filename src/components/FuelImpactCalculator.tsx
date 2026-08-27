@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Car, Truck } from "lucide-react";
 
 export interface RegionFuelAverage {
   petrol: number | null;
@@ -96,8 +97,8 @@ export default function FuelImpactCalculator({ europe, us }: Props) {
             </div>
 
             <div className="mt-4 flex items-baseline justify-between">
-              <span className="text-sm text-[#5b6472]">
-                🚗 Pieno auto ({tank.numericValue} L)
+              <span className="flex items-center gap-1.5 text-sm text-[#5b6472]">
+                <Car size={14} /> Pieno auto ({tank.numericValue} L)
               </span>
               <span className="font-mono text-lg font-semibold tabular-nums">
                 {data.petrol !== null
@@ -107,8 +108,8 @@ export default function FuelImpactCalculator({ europe, us }: Props) {
             </div>
 
             <div className="mt-2 flex items-baseline justify-between">
-              <span className="text-sm text-[#5b6472]">
-                🚛 Costo carburante ogni 100 km guidati da un camion
+              <span className="flex items-center gap-1.5 text-sm text-[#5b6472]">
+                <Truck size={14} /> Costo carburante ogni 100 km guidati da un camion
               </span>
               <span className="font-mono text-lg font-semibold tabular-nums">
                 {data.diesel !== null

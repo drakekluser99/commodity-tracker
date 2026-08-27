@@ -2,8 +2,11 @@ import { getLatestCommodityPrices, getLatestFuelPrices } from "@/lib/db/queries"
 import EuropeFuelMap from "@/components/EuropeFuelMap";
 import FuelImpactCalculator from "@/components/FuelImpactCalculator";
 import Link from "next/link";
+import { Code2, Clock, Fuel, Globe2, Calculator, BarChart3 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
+
+const GITHUB_URL = "https://github.com/drakekluser99/commodity-tracker";
 
 const CATEGORY_LABELS: Record<string, string> = {
   energy: "Energia",
@@ -15,7 +18,7 @@ const CONTINENT_LABELS: Record<string, string> = {
   europe: "Europa",
   north_america: "Nord America",
   oceania: "Oceania",
-  latam: "LatAm",
+  latam: "America Latina",
 };
 
 function formatDate(date: Date): string {
@@ -25,6 +28,23 @@ function formatDate(date: Date): string {
     year: "numeric",
   }).format(date);
 }
+
+function formatDateTime(date: Date): string {
+  return new Intl.DateTimeFormat("it-IT", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+const NAV_ITEMS = [
+  { href: "#mappa", label: "Mappa", icon: Globe2 },
+  { href: "#calcolatore", label: "Cosa significa", icon: Calculator },
+  { href: "#materie-prime", label: "Materie prime", icon: BarChart3 },
+  { href: "#carburanti", label: "Carburanti", icon: Fuel },
+];
 
 export default async function Home() {
   const [commodityPrices, fuelPrices] = await Promise.all([
@@ -70,27 +90,70 @@ export default async function Home() {
     currency: "USD",
   };
 
+  const allTimestamps = [
+    ...commodityPrices.map((c) => c.recordedAt),
+    ...fuelPrices.map((f) => f.recordedAt),
+  ];
+  const lastUpdated =
+    allTimestamps.length > 0
+      ? new Date(Math.max(...allTimestamps.map((d) => d.getTime())))
+      : null;
+
   return (
     <div className="min-h-screen bg-[#f7f8fa] text-[#14181f]">
       <header className="border-b border-[#dde1e7] bg-white">
         <div className="mx-auto max-w-5xl px-6 py-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0f6b66]">
-            Commodity Tracker · Progetto open source
-          </p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-            Materie prime e carburanti, in tempo quasi reale
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[#5b6472]">
-            Dati raccolti da fonti pubbliche: Alpha Vantage per le materie
-            prime globali, la Commissione Europea e l&apos;EIA per i
-            carburanti al consumo. Aggiornati automaticamente via cron job.
-          </p>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0f6b66]">
+                Commodity Tracker · Progetto open source
+              </p>
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+                Materie prime e carburanti, in tempo quasi reale
+              </h1>
+              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[#5b6472]">
+                Dati raccolti da fonti pubbliche: Alpha Vantage per le materie
+                prime globali, la Commissione Europea e l&apos;EIA per i
+                carburanti al consumo. Aggiornati automaticamente ogni
+                giorno.
+              </p>
+            </div>
+            <a
+              href={GITHUB_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 rounded-md border border-[#dde1e7] px-3 py-2 text-sm font-medium text-[#5b6472] transition-colors hover:border-[#0f6b66] hover:text-[#0f6b66]"
+            >
+              <Code2 size={16} />
+              Codice sorgente
+            </a>
+          </div>
+
+          {lastUpdated && (
+            <div className="mt-4 flex items-center gap-1.5 text-xs text-[#8891a0]">
+              <Clock size={13} />
+              Ultimo aggiornamento: {formatDateTime(lastUpdated)}
+            </div>
+          )}
+
+          <nav className="mt-6 flex flex-wrap gap-1 border-t border-[#eef0f3] pt-4">
+            {NAV_ITEMS.map(({ href, label, icon: Icon }) => (
+              <a
+                key={href}
+                href={href}
+                className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm text-[#5b6472] transition-colors hover:bg-[#f7f8fa] hover:text-[#0f6b66]"
+              >
+                <Icon size={14} />
+                {label}
+              </a>
+            ))}
+          </nav>
         </div>
       </header>
 
       <main className="mx-auto max-w-5xl px-6 py-10">
         {europeanPetrolPrices.length > 0 && (
-          <section>
+          <section id="mappa" className="scroll-mt-8">
             <h2 className="text-lg font-semibold">Prezzo benzina in Europa</h2>
             <div className="mt-4 rounded-lg border border-[#dde1e7] bg-white p-4">
               <EuropeFuelMap prices={europeanPetrolPrices} />
@@ -103,7 +166,7 @@ export default async function Home() {
         )}
 
         {(europeAverage.petrol !== null || usAverage.petrol !== null) && (
-          <section className="mt-12">
+          <section id="calcolatore" className="mt-12 scroll-mt-8">
             <h2 className="text-lg font-semibold">Cosa significa in pratica</h2>
             <p className="mt-1 text-sm text-[#5b6472]">
               Quanto costa un pieno per un&apos;auto normale, e quanto pesa il
@@ -116,13 +179,13 @@ export default async function Home() {
           </section>
         )}
 
-        <section className={europeanPetrolPrices.length > 0 ? "mt-12" : ""}>
+        <section id="materie-prime" className="mt-12 scroll-mt-8">
           <h2 className="text-lg font-semibold">Materie prime globali</h2>
           {commodityPrices.length === 0 ? (
             <EmptyState label="Nessun dato ancora. Il cron job non è ancora girato per questa fonte." />
           ) : (
-            <div className="mt-4 overflow-hidden rounded-lg border border-[#dde1e7] bg-white">
-              <table className="w-full text-sm">
+            <div className="mt-4 overflow-x-auto rounded-lg border border-[#dde1e7] bg-white">
+              <table className="w-full min-w-[480px] text-sm">
                 <thead>
                   <tr className="border-b border-[#dde1e7] text-left text-xs uppercase tracking-wide text-[#5b6472]">
                     <th className="px-4 py-3 font-medium">Materia prima</th>
@@ -159,7 +222,7 @@ export default async function Home() {
           </SourceNote>
         </section>
 
-        <section className="mt-12">
+        <section id="carburanti" className="mt-12 scroll-mt-8">
           <h2 className="text-lg font-semibold">Carburanti al consumo</h2>
           {fuelsByContinent.size === 0 ? (
             <EmptyState label="Nessun dato ancora. Il cron job non è ancora girato per questa fonte." />
@@ -170,36 +233,38 @@ export default async function Home() {
                   <div className="border-b border-[#dde1e7] bg-[#f7f8fa] px-4 py-2 text-xs font-semibold uppercase tracking-wide text-[#5b6472]">
                     {CONTINENT_LABELS[continent] ?? continent}
                   </div>
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-[#dde1e7] text-left text-xs uppercase tracking-wide text-[#5b6472]">
-                        <th className="px-4 py-3 font-medium">Regione</th>
-                        <th className="px-4 py-3 font-medium">Carburante</th>
-                        <th className="px-4 py-3 text-right font-medium">Prezzo / litro</th>
-                        <th className="px-4 py-3 text-right font-medium">Data</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {fuels.map((f) => (
-                        <tr
-                          key={`${f.regionName}-${f.fuelType}`}
-                          className="border-b border-[#eef0f3] transition-colors last:border-0 hover:bg-[#f7f8fa]"
-                        >
-                          <td className="px-4 py-3">{f.regionName}</td>
-                          <td className="px-4 py-3 text-[#5b6472] capitalize">
-                            {f.fuelType === "petrol" ? "Benzina" : "Diesel"}
-                          </td>
-                          <td className="px-4 py-3 text-right font-mono tabular-nums">
-                            {parseFloat(f.price).toFixed(3)}{" "}
-                            <span className="text-xs text-[#8891a0]">{f.currency}</span>
-                          </td>
-                          <td className="px-4 py-3 text-right text-[#8891a0]">
-                            {formatDate(f.recordedAt)}
-                          </td>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[480px] text-sm">
+                      <thead>
+                        <tr className="border-b border-[#dde1e7] text-left text-xs uppercase tracking-wide text-[#5b6472]">
+                          <th className="px-4 py-3 font-medium">Regione</th>
+                          <th className="px-4 py-3 font-medium">Carburante</th>
+                          <th className="px-4 py-3 text-right font-medium">Prezzo / litro</th>
+                          <th className="px-4 py-3 text-right font-medium">Data</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {fuels.map((f) => (
+                          <tr
+                            key={`${f.regionName}-${f.fuelType}`}
+                            className="border-b border-[#eef0f3] transition-colors last:border-0 hover:bg-[#f7f8fa]"
+                          >
+                            <td className="px-4 py-3">{f.regionName}</td>
+                            <td className="px-4 py-3 text-[#5b6472] capitalize">
+                              {f.fuelType === "petrol" ? "Benzina" : "Diesel"}
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono tabular-nums">
+                              {parseFloat(f.price).toFixed(3)}{" "}
+                              <span className="text-xs text-[#8891a0]">{f.currency}</span>
+                            </td>
+                            <td className="px-4 py-3 text-right text-[#8891a0]">
+                              {formatDate(f.recordedAt)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               ))}
             </div>
@@ -211,12 +276,28 @@ export default async function Home() {
         </section>
       </main>
 
-      <footer className="mx-auto max-w-5xl px-6 py-10 text-xs text-[#8891a0]">
-        Progetto open source · dati pubblici, nessuna garanzia di accuratezza
-        {" · "}
-        <Link href="/metodologia" className="text-[#0f6b66] hover:underline">
-          Metodologia
-        </Link>
+      <footer className="border-t border-[#dde1e7] bg-white">
+        <div className="mx-auto max-w-5xl px-6 py-8">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <p className="text-xs text-[#8891a0]">
+              Progetto open source · dati pubblici, nessuna garanzia di
+              accuratezza
+            </p>
+            <div className="flex gap-4 text-xs">
+              <Link href="/metodologia" className="text-[#0f6b66] hover:underline">
+                Metodologia
+              </Link>
+              <a
+                href={GITHUB_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#0f6b66] hover:underline"
+              >
+                GitHub
+              </a>
+            </div>
+          </div>
+        </div>
       </footer>
     </div>
   );
