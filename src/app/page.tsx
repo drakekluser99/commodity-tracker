@@ -1,4 +1,4 @@
-iimport { getLatestCommodityPrices, getLatestFuelPrices } from "@/lib/db/queries";
+import { getLatestCommodityPrices, getLatestFuelPrices } from "@/lib/db/queries";
 
 // Forza il rendering dinamico ad ogni richiesta invece di una pagina
 // statica generata una volta sola in fase di build: i prezzi cambiano
