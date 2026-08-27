@@ -1,6 +1,7 @@
 import { getLatestCommodityPrices, getLatestFuelPrices } from "@/lib/db/queries";
 import EuropeFuelMap from "@/components/EuropeFuelMap";
 import FuelImpactCalculator from "@/components/FuelImpactCalculator";
+import MobileNav from "@/components/MobileNav";
 import Link from "next/link";
 import { Code2, Clock, Fuel, Globe2, Calculator, BarChart3 } from "lucide-react";
 
@@ -109,7 +110,7 @@ export default async function Home() {
   return (
     <div className="min-h-screen bg-[#f7f8fa] text-[#14181f]">
       <header className="border-b border-[#dde1e7] bg-white">
-        <div className="mx-auto max-w-5xl px-6 py-8">
+        <div className="mx-auto max-w-7xl px-6 py-8">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0f6b66]">
@@ -125,15 +126,18 @@ export default async function Home() {
                 giorno.
               </p>
             </div>
-            <a
-              href={GITHUB_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 rounded-md border border-[#dde1e7] px-3 py-2 text-sm font-medium text-[#5b6472] transition-colors hover:border-[#0f6b66] hover:text-[#0f6b66]"
-            >
-              <Code2 size={16} />
-              Codice sorgente
-            </a>
+            <div className="flex items-center gap-2">
+              <a
+                href={GITHUB_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hidden items-center gap-2 rounded-md border border-[#dde1e7] px-3 py-2 text-sm font-medium text-[#5b6472] transition-colors hover:border-[#0f6b66] hover:text-[#0f6b66] sm:flex"
+              >
+                <Code2 size={16} />
+                Codice sorgente
+              </a>
+              <MobileNav items={NAV_ITEMS} githubUrl={GITHUB_URL} />
+            </div>
           </div>
 
           {lastUpdated && (
@@ -143,7 +147,7 @@ export default async function Home() {
             </div>
           )}
 
-          <nav className="mt-6 flex flex-wrap gap-1 border-t border-[#eef0f3] pt-4">
+          <nav className="mt-6 hidden flex-wrap gap-1 border-t border-[#eef0f3] pt-4 sm:flex">
             {NAV_ITEMS.map(({ href, label, icon: Icon }) => (
               <a
                 key={href}
@@ -158,7 +162,7 @@ export default async function Home() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-6 py-10">
+      <main className="mx-auto max-w-7xl px-6 py-10">
         {europeanFuelData.length > 0 && (
           <section id="mappa" className="scroll-mt-8">
             <h2 className="text-lg font-semibold">Prezzo benzina in Europa</h2>
@@ -286,7 +290,7 @@ export default async function Home() {
       <footer className="relative mt-8 rounded-t-4xl border-t border-[#dde1e7] bg-white">
         <div className="absolute left-1/2 right-1/2 top-0 h-px w-1/3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-r from-transparent via-[#0f6b66]/30 to-transparent blur-[1px]" />
 
-        <div className="mx-auto max-w-5xl px-6 py-12">
+        <div className="mx-auto max-w-7xl px-6 py-12">
           <div className="grid gap-8 sm:grid-cols-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0f6b66]">
