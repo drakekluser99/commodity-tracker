@@ -1,5 +1,6 @@
 import { getLatestCommodityPrices, getLatestFuelPrices } from "@/lib/db/queries";
 import EuropeFuelMap from "@/components/EuropeFuelMap";
+import FuelImpactCalculator from "@/components/FuelImpactCalculator";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,33 @@ export default async function Home() {
     .filter((f) => f.fuelType === "petrol")
     .map((f) => ({ countryName: f.regionName, price: parseFloat(f.price) }));
 
+  function average(values: number[]): number | null {
+    if (values.length === 0) return null;
+    return values.reduce((sum, v) => sum + v, 0) / values.length;
+  }
+
+  const europeFuels = fuelsByContinent.get("europe") ?? [];
+  const europeAverage = {
+    petrol: average(
+      europeFuels.filter((f) => f.fuelType === "petrol").map((f) => parseFloat(f.price))
+    ),
+    diesel: average(
+      europeFuels.filter((f) => f.fuelType === "diesel").map((f) => parseFloat(f.price))
+    ),
+    currency: "EUR",
+  };
+
+  const usFuels = fuelsByContinent.get("north_america") ?? [];
+  const usAverage = {
+    petrol: usFuels.find((f) => f.fuelType === "petrol")
+      ? parseFloat(usFuels.find((f) => f.fuelType === "petrol")!.price)
+      : null,
+    diesel: usFuels.find((f) => f.fuelType === "diesel")
+      ? parseFloat(usFuels.find((f) => f.fuelType === "diesel")!.price)
+      : null,
+    currency: "USD",
+  };
+
   return (
     <div className="min-h-screen bg-[#f7f8fa] text-[#14181f]">
       <header className="border-b border-[#dde1e7] bg-white">
@@ -73,6 +101,20 @@ export default async function Home() {
           </section>
         )}
 
+        {(europeAverage.petrol !== null || usAverage.petrol !== null) && (
+          <section className="mt-12">
+            <h2 className="text-lg font-semibold">Cosa significa in pratica</h2>
+            <p className="mt-1 text-sm text-[#5b6472]">
+              Quanto costa un pieno per un&apos;auto normale, e quanto pesa il
+              carburante sui trasporti — camion che portano cibo, materiali,
+              merci.
+            </p>
+            <div className="mt-4">
+              <FuelImpactCalculator europe={europeAverage} us={usAverage} />
+            </div>
+          </section>
+        )}
+
         <section className={europeanPetrolPrices.length > 0 ? "mt-12" : ""}>
           <h2 className="text-lg font-semibold">Materie prime globali</h2>
           {commodityPrices.length === 0 ? (
@@ -90,7 +132,7 @@ export default async function Home() {
                 </thead>
                 <tbody>
                   {commodityPrices.map((c) => (
-                    <tr key={c.symbol} className="border-b border-[#eef0f3] last:border-0">
+                    <tr key={c.symbol} className="border-b border-[#eef0f3] transition-colors last:border-0 hover:bg-[#f7f8fa]">
                       <td className="px-4 py-3">
                         <div className="font-medium">{c.name}</div>
                         <div className="text-xs text-[#8891a0]">{c.symbol}</div>
@@ -140,7 +182,7 @@ export default async function Home() {
                       {fuels.map((f) => (
                         <tr
                           key={`${f.regionName}-${f.fuelType}`}
-                          className="border-b border-[#eef0f3] last:border-0"
+                          className="border-b border-[#eef0f3] transition-colors last:border-0 hover:bg-[#f7f8fa]"
                         >
                           <td className="px-4 py-3">{f.regionName}</td>
                           <td className="px-4 py-3 text-[#5b6472] capitalize">
