@@ -10,7 +10,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
-    "inspect:eu-bulletin": "tsx scripts/inspect-eu-bulletin.ts"
+    "inspect:eu-bulletin": "tsx scripts/inspect-eu-bulletin.ts",
+    "inspect:eia": "tsx scripts/inspect-eia.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

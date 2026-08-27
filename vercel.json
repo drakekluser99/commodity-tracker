@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/fetch-eu-fuel-prices",
       "schedule": "0 12 * * 4"
+    },
+    {
+      "path": "/api/cron/fetch-us-fuel-prices",
+      "schedule": "0 18 * * 1"
     }
   ]
 }
