@@ -1,9 +1,6 @@
 import { getLatestCommodityPrices, getLatestFuelPrices } from "@/lib/db/queries";
+import EuropeFuelMap from "@/components/EuropeFuelMap";
 
-// Forza il rendering dinamico ad ogni richiesta invece di una pagina
-// statica generata una volta sola in fase di build: i prezzi cambiano
-// nel tempo, quindi vogliamo sempre leggere l'ultimo dato dal database,
-// non una versione "congelata" al momento del deploy.
 export const dynamic = "force-dynamic";
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -40,6 +37,10 @@ export default async function Home() {
     fuelsByContinent.set(fuel.continent, list);
   }
 
+  const europeanPetrolPrices = (fuelsByContinent.get("europe") ?? [])
+    .filter((f) => f.fuelType === "petrol")
+    .map((f) => ({ countryName: f.regionName, price: parseFloat(f.price) }));
+
   return (
     <div className="min-h-screen bg-[#f7f8fa] text-[#14181f]">
       <header className="border-b border-[#dde1e7] bg-white">
@@ -59,7 +60,20 @@ export default async function Home() {
       </header>
 
       <main className="mx-auto max-w-5xl px-6 py-10">
-        <section>
+        {europeanPetrolPrices.length > 0 && (
+          <section>
+            <h2 className="text-lg font-semibold">Prezzo benzina in Europa</h2>
+            <div className="mt-4 rounded-lg border border-[#dde1e7] bg-white p-4">
+              <EuropeFuelMap prices={europeanPetrolPrices} />
+            </div>
+            <SourceNote>
+              Fonte: Bollettino Petrolifero Settimanale, Commissione Europea ·
+              Confini amministrativi: Natural Earth (dominio pubblico)
+            </SourceNote>
+          </section>
+        )}
+
+        <section className={europeanPetrolPrices.length > 0 ? "mt-12" : ""}>
           <h2 className="text-lg font-semibold">Materie prime globali</h2>
           {commodityPrices.length === 0 ? (
             <EmptyState label="Nessun dato ancora. Il cron job non è ancora girato per questa fonte." />
@@ -96,6 +110,10 @@ export default async function Home() {
               </table>
             </div>
           )}
+          <SourceNote>
+            Fonte: Alpha Vantage (dati di mercato) · Aggiornamento:
+            giornaliero via cron job
+          </SourceNote>
         </section>
 
         <section className="mt-12">
@@ -143,6 +161,10 @@ export default async function Home() {
               ))}
             </div>
           )}
+          <SourceNote>
+            Fonte: Bollettino Petrolifero Settimanale (UE) · EIA (USA) ·
+            Prezzi medi nazionali, non punti vendita specifici
+          </SourceNote>
         </section>
       </main>
 
@@ -150,6 +172,12 @@ export default async function Home() {
         Progetto open source · dati pubblici, nessuna garanzia di accuratezza
       </footer>
     </div>
+  );
+}
+
+function SourceNote({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="mt-2 text-xs text-[#8891a0]">{children}</p>
   );
 }
 
