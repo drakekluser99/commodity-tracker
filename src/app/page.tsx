@@ -136,7 +136,10 @@ export default async function Home() {
                 <Code2 size={16} />
                 Codice sorgente
               </a>
-              <MobileNav items={NAV_ITEMS} githubUrl={GITHUB_URL} />
+              <MobileNav
+                items={NAV_ITEMS.map(({ href, label }) => ({ href, label }))}
+                githubUrl={GITHUB_URL}
+              />
             </div>
           </div>
 
