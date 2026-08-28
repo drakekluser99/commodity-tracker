@@ -6,19 +6,19 @@ export const metadata = {
 
 export default function Metodologia() {
   return (
-    <div className="min-h-screen bg-[#f7f8fa] text-[#14181f]">
-      <header className="border-b border-[#dde1e7] bg-white">
+    <div className="min-h-screen bg-system-bg text-system-ink">
+      <header className="border-b border-system-border bg-white">
         <div className="mx-auto max-w-3xl px-6 py-8">
           <Link
             href="/"
-            className="text-xs font-semibold uppercase tracking-[0.14em] text-[#0f6b66] hover:underline"
+            className="text-xs font-semibold uppercase tracking-[0.14em] text-system-accent hover:underline"
           >
             ← Torna alla dashboard
           </Link>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">
             Metodologia
           </h1>
-          <p className="mt-2 text-sm leading-relaxed text-[#5b6472]">
+          <p className="mt-2 text-sm leading-relaxed text-system-ink-secondary">
             Come raccogliamo i dati, da dove vengono, e quali sono i loro
             limiti. Un numero senza contesto può essere fuorviante quanto
             un numero sbagliato — qui trovi il contesto.
@@ -46,7 +46,7 @@ export default function Metodologia() {
         </Section>
 
         <Section title="Frequenza di aggiornamento">
-          <p className="text-sm leading-relaxed text-[#5b6472]">
+          <p className="text-sm leading-relaxed text-system-ink-secondary">
             I dati vengono raccolti automaticamente tramite processi
             pianificati (cron job): le materie prime globali giornalmente,
             i carburanti europei settimanalmente (allineati alla
@@ -58,7 +58,7 @@ export default function Metodologia() {
         </Section>
 
         <Section title="Limiti da conoscere">
-          <ul className="list-disc space-y-2 pl-5 text-sm leading-relaxed text-[#5b6472]">
+          <ul className="list-disc space-y-2 pl-5 text-sm leading-relaxed text-system-ink-secondary">
             <li>
               I prezzi dei carburanti sono <strong>medie nazionali</strong>,
               non il prezzo di un singolo distributore. Il prezzo reale
@@ -86,7 +86,7 @@ export default function Metodologia() {
         </Section>
 
         <Section title="Codice sorgente">
-          <p className="text-sm leading-relaxed text-[#5b6472]">
+          <p className="text-sm leading-relaxed text-system-ink-secondary">
             Questo è un progetto open source: chiunque può ispezionare il
             codice, verificare come i dati vengono raccolti e processati,
             o contribuire con miglioramenti.
@@ -94,7 +94,7 @@ export default function Metodologia() {
         </Section>
       </main>
 
-      <footer className="mx-auto max-w-3xl px-6 py-10 text-xs text-[#8891a0]">
+      <footer className="mx-auto max-w-3xl px-6 py-10 text-xs text-system-ink-muted">
         Progetto open source · dati pubblici, nessuna garanzia di accuratezza
       </footer>
     </div>
@@ -112,16 +112,16 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function SourceItem({ name, desc, link }: { name: string; desc: string; link: string }) {
   return (
-    <div className="mb-4 rounded-lg border border-[#dde1e7] bg-white p-4 last:mb-0">
+    <div className="mb-4 rounded-lg border border-system-border bg-white p-4 last:mb-0">
       <a
         href={link}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-sm font-semibold text-[#0f6b66] hover:underline"
+        className="text-sm font-semibold text-system-accent hover:underline"
       >
         {name} ↗
       </a>
-      <p className="mt-1 text-sm leading-relaxed text-[#5b6472]">{desc}</p>
+      <p className="mt-1 text-sm leading-relaxed text-system-ink-secondary">{desc}</p>
     </div>
   );
 }

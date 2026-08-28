@@ -29,13 +29,13 @@ export default function MobileNav({ items, githubUrl }: Props) {
         onClick={() => setOpen(!open)}
         aria-label={open ? "Chiudi menu" : "Apri menu"}
         aria-expanded={open}
-        className="flex items-center justify-center rounded-md border border-[#dde1e7] p-2 text-[#5b6472] transition-colors hover:border-[#0f6b66] hover:text-[#0f6b66]"
+        className="flex items-center justify-center rounded-md border border-system-border p-2 text-system-ink-secondary transition-colors hover:border-system-accent hover:text-system-accent"
       >
         {open ? <X size={18} /> : <Menu size={18} />}
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-20 mt-2 w-56 rounded-lg border border-[#dde1e7] bg-white py-2 shadow-lg">
+        <div className="absolute right-0 top-full z-20 mt-2 w-56 rounded-lg border border-system-border bg-white py-2 shadow-lg">
           {items.map(({ href, label }) => {
             const Icon = ICONS[href] ?? Globe2;
             return (
@@ -43,20 +43,20 @@ export default function MobileNav({ items, githubUrl }: Props) {
                 key={href}
                 href={href}
                 onClick={() => setOpen(false)}
-                className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-[#5b6472] transition-colors hover:bg-[#f7f8fa] hover:text-[#0f6b66]"
+                className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-system-ink-secondary transition-colors hover:bg-system-bg hover:text-system-accent"
               >
                 <Icon size={15} />
                 {label}
               </a>
             );
           })}
-          <div className="my-1 border-t border-[#eef0f3]" />
+          <div className="my-1 border-t border-system-border-subtle" />
           <a
             href={githubUrl}
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => setOpen(false)}
-            className="block px-4 py-2.5 text-sm text-[#5b6472] transition-colors hover:bg-[#f7f8fa] hover:text-[#0f6b66]"
+            className="block px-4 py-2.5 text-sm text-system-ink-secondary transition-colors hover:bg-system-bg hover:text-system-accent"
           >
             Codice sorgente
           </a>

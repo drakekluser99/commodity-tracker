@@ -50,10 +50,10 @@ export default function FuelImpactCalculator({ europe, us }: Props) {
   ];
 
   return (
-    <div className="rounded-lg border border-[#dde1e7] bg-white p-6">
+    <div className="rounded-lg border border-system-border bg-white p-6">
       <div className="grid gap-6 sm:grid-cols-2">
         <label className="block">
-          <span className="text-xs font-medium uppercase tracking-wide text-[#5b6472]">
+          <span className="text-xs font-medium uppercase tracking-wide text-system-ink-secondary">
             Capacità serbatoio auto (litri)
           </span>
           <input
@@ -63,11 +63,11 @@ export default function FuelImpactCalculator({ europe, us }: Props) {
             value={tank.raw}
             onChange={(e) => tank.setRaw(e.target.value)}
             placeholder="es. 50"
-            className="mt-1 w-full rounded-md border border-[#dde1e7] px-3 py-2 font-mono tabular-nums focus:border-[#0f6b66] focus:outline-none"
+            className="mt-1 w-full rounded-md border border-system-border px-3 py-2 font-mono tabular-nums focus:border-system-accent focus:outline-none"
           />
         </label>
         <label className="block">
-          <span className="text-xs font-medium uppercase tracking-wide text-[#5b6472]">
+          <span className="text-xs font-medium uppercase tracking-wide text-system-ink-secondary">
             Consumo camion (litri ogni 100 km)
           </span>
           <input
@@ -77,7 +77,7 @@ export default function FuelImpactCalculator({ europe, us }: Props) {
             value={truck.raw}
             onChange={(e) => truck.setRaw(e.target.value)}
             placeholder="es. 33"
-            className="mt-1 w-full rounded-md border border-[#dde1e7] px-3 py-2 font-mono tabular-nums focus:border-[#0f6b66] focus:outline-none"
+            className="mt-1 w-full rounded-md border border-system-border px-3 py-2 font-mono tabular-nums focus:border-system-accent focus:outline-none"
           />
         </label>
       </div>
@@ -96,7 +96,7 @@ export default function FuelImpactCalculator({ europe, us }: Props) {
             </div>
 
             <div className="mt-4 flex items-baseline justify-between">
-              <span className="flex items-center gap-1.5 text-sm text-[#5b6472]">
+              <span className="flex items-center gap-1.5 text-sm text-system-ink-secondary">
                 <Car size={14} /> Pieno auto ({tank.numericValue} L)
               </span>
               <span className="font-mono text-lg font-semibold tabular-nums">
@@ -107,7 +107,7 @@ export default function FuelImpactCalculator({ europe, us }: Props) {
             </div>
 
             <div className="mt-2 flex items-baseline justify-between">
-              <span className="flex items-center gap-1.5 text-sm text-[#5b6472]">
+              <span className="flex items-center gap-1.5 text-sm text-system-ink-secondary">
                 <Truck size={14} /> Costo carburante ogni 100 km guidati da un camion
               </span>
               <span className="font-mono text-lg font-semibold tabular-nums">
@@ -120,9 +120,9 @@ export default function FuelImpactCalculator({ europe, us }: Props) {
         ))}
       </div>
 
-      <div className="mt-4 space-y-2 text-xs leading-relaxed text-[#8891a0]">
+      <div className="mt-4 space-y-2 text-xs leading-relaxed text-system-ink-muted">
         <p>
-          <strong className="text-[#5b6472]">Perché i 100 km del camion contano:</strong>{" "}
+          <strong className="text-system-ink-secondary">Perché i 100 km del camion contano:</strong>{" "}
           questo è il costo di carburante che un&apos;azienda di trasporti
           paga per ogni 100 km percorsi trasportando merci — cibo,
           materiali, prodotti. Quando il diesel sale, questo costo si

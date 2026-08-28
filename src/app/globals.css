@@ -35,8 +35,29 @@
   --color-system-bg: #fafafa;
   --color-system-panel: #f2f3f5;
   --color-system-ink: #111318;
+  /*
+   * Due grigi per il testo, non uno solo: il progetto distingue due
+   * livelli gerarchici e vanno tenuti separati.
+   *   `ink-secondary` (#5b6472) — testo "di lettura": paragrafi,
+   *      descrizioni, link di navigazione. Serve contrasto sufficiente
+   *      per leggere frasi intere.
+   *   `ink-muted` (già presente) — dettagli marginali: text-xs, unità
+   *      di misura, celle di tabella secondarie. Più chiaro, deve
+   *      restare in secondo piano.
+   * Unificarli appiattirebbe la gerarchia visiva, quindi serve il
+   * token dedicato in più.
+   */
+  --color-system-ink-secondary: #5b6472;
   --color-system-ink-muted: #6b7280;
   --color-system-border: #e2e4e9;
+  /*
+   * Stesso ragionamento sui bordi, due livelli distinti:
+   *   `border` (già presente) — bordo "strutturale" di card e tabelle.
+   *   `border-subtle` (#eef0f3) — divisori interni più leggeri (righe
+   *      di tabella, separatori di sezione) che non devono competere
+   *      col contorno del contenitore.
+   */
+  --color-system-border-subtle: #eef0f3;
   --color-system-border-strong: #111318;
   --color-system-accent: #0f6b66;
   --color-system-accent-down: #b34324;

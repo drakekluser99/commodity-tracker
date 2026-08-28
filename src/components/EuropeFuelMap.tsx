@@ -100,11 +100,11 @@ export default function EuropeFuelMap({ prices, euAveragePetrol }: Props) {
       </ComposableMap>
 
       {hovered && (
-        <div className="pointer-events-none absolute left-4 top-4 rounded-md border border-[#dde1e7] bg-white px-3 py-2 text-sm shadow-md">
+        <div className="pointer-events-none absolute left-4 top-4 rounded-md border border-system-border bg-white px-3 py-2 text-sm shadow-md">
           <div className="font-medium">{hovered.countryName}</div>
           {hovered.petrol !== null && (
             <div className="mt-1 flex items-center justify-between gap-4">
-              <span className="text-xs text-[#8891a0]">Benzina</span>
+              <span className="text-xs text-system-ink-muted">Benzina</span>
               <span className="font-mono tabular-nums">
                 {hovered.petrol.toFixed(3)} €/L
               </span>
@@ -112,14 +112,14 @@ export default function EuropeFuelMap({ prices, euAveragePetrol }: Props) {
           )}
           {hovered.diesel !== null && (
             <div className="flex items-center justify-between gap-4">
-              <span className="text-xs text-[#8891a0]">Diesel</span>
+              <span className="text-xs text-system-ink-muted">Diesel</span>
               <span className="font-mono tabular-nums">
                 {hovered.diesel.toFixed(3)} €/L
               </span>
             </div>
           )}
           {hovered.petrol !== null && euAveragePetrol !== null && (
-            <div className="mt-1 border-t border-[#eef0f3] pt-1 text-xs text-[#8891a0]">
+            <div className="mt-1 border-t border-system-border-subtle pt-1 text-xs text-system-ink-muted">
               {hovered.petrol > euAveragePetrol ? "+" : ""}
               {((hovered.petrol - euAveragePetrol) * 1000).toFixed(0)}{" "}
               millesimi vs media UE
@@ -128,7 +128,7 @@ export default function EuropeFuelMap({ prices, euAveragePetrol }: Props) {
         </div>
       )}
 
-      <div className="mt-3 flex items-center gap-2 text-xs text-[#8891a0]">
+      <div className="mt-3 flex items-center gap-2 text-xs text-system-ink-muted">
         <span className="font-mono">{min.toFixed(2)} €/L</span>
         <div
           className="h-2 flex-1 rounded-full"
@@ -138,7 +138,7 @@ export default function EuropeFuelMap({ prices, euAveragePetrol }: Props) {
         />
         <span className="font-mono">{max.toFixed(2)} €/L</span>
       </div>
-      <p className="mt-2 text-xs text-[#8891a0]">
+      <p className="mt-2 text-xs text-system-ink-muted">
         Scorri con la rotellina per ingrandire, trascina per spostarti.
         Passa il mouse su un paese per i dettagli.
       </p>
