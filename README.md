@@ -1,36 +1,67 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Commodity Tracker
 
-## Getting Started
+Progetto open source di tracciamento prezzi di materie prime globali e
+carburanti al consumo: ogni dato con la sua fonte, la sua data e i suoi limiti
+dichiarati esplicitamente.
 
-First, run the development server:
+**Sito live:** https://commodity-tracker-one-delta.vercel.app
+
+## Stack tecnico
+
+- [Next.js 16](https://nextjs.org) (App Router) + TypeScript
+- Tailwind CSS
+- Drizzle ORM + [Neon](https://neon.tech) Postgres (serverless)
+- Deploy su [Vercel](https://vercel.com), con redeploy automatico a ogni push su `main`
+
+## Fonti dati e frequenza di aggiornamento
+
+| Fonte | Dati | Aggiornamento |
+| --- | --- | --- |
+| [Alpha Vantage](https://www.alphavantage.co/documentation/#commodities) | Materie prime globali (petrolio, gas, metalli, agricole) | Giornaliero |
+| [Bollettino Petrolifero Settimanale](https://energy.ec.europa.eu/data-and-analysis/weekly-oil-bulletin_en) (Commissione Europea) | Carburanti al consumo, paesi UE | Ogni giovedì |
+| [EIA](https://www.eia.gov/opendata/) (U.S. Energy Information Administration) | Carburanti al consumo, USA | Ogni lunedì |
+
+L'aggiornamento è gestito da cron job schedulati in `vercel.json`, che
+chiamano gli endpoint protetti sotto `src/app/api/cron/`.
+
+## Sviluppo locale
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Apri [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Variabili d'ambiente
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Copia `.env.example` in `.env.local` e imposta i valori:
 
-## Learn More
+| Variabile | Obbligatoria | Descrizione |
+| --- | --- | --- |
+| `DATABASE_URL` | sì | Connection string Postgres di Neon |
+| `CRON_SECRET` | sì | Stringa segreta che protegge gli endpoint `/api/cron/*` (es. `openssl rand -hex 32`) |
+| `ALPHA_VANTAGE_API_KEY` | per il cron materie prime | API key gratuita — https://www.alphavantage.co/support/#api-key |
+| `EIA_API_KEY` | per il cron carburanti USA | API key gratuita — https://www.eia.gov/opendata/register.php |
 
-To learn more about Next.js, take a look at the following resources:
+### Comandi utili
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm run dev            # server di sviluppo
+npm run build          # build di produzione
+npm run db:generate    # genera le migrazioni Drizzle dallo schema
+npm run db:migrate     # applica le migrazioni
+npm run db:studio      # Drizzle Studio
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Licenza e disclaimer
 
-## Deploy on Vercel
+Progetto open source · dati pubblici, **nessuna garanzia di accuratezza**.
+I prezzi sono medie nazionali o dati di mercato ritardati, non quotazioni in
+tempo reale né prezzi di punti vendita specifici. Vedi la
+[pagina Metodologia](https://commodity-tracker-one-delta.vercel.app/metodologia)
+per fonti, limiti e frequenza di aggiornamento.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Autore
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Creato da [Yuri Copparini](https://www.linkedin.com/in/yuri-copparini).
