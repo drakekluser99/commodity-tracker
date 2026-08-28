@@ -220,7 +220,7 @@ export default async function Home() {
               <a
                 key={href}
                 href={href}
-                className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm text-system-ink-secondary transition-colors hover:bg-system-bg hover:text-system-accent"
+                className="flex items-center gap-1.5 rounded-md border border-system-border px-3 py-1.5 font-mono text-xs uppercase tracking-wider text-system-ink-secondary transition-colors hover:border-system-accent hover:bg-system-bg hover:text-system-accent"
               >
                 <Icon size={14} />
                 {label}
@@ -233,7 +233,10 @@ export default async function Home() {
       <main className="mx-auto max-w-screen-2xl px-6 py-10">
         {europeanFuelData.length > 0 && (
           <section id="mappa" className="scroll-mt-8">
-            <h2 className="text-lg font-semibold">Prezzo benzina in Europa</h2>
+            <div className="flex items-baseline gap-3">
+              <span className="font-mono text-xs text-system-ink-muted">01 /</span>
+              <h2 className="text-lg font-semibold text-system-ink">Prezzo benzina in Europa</h2>
+            </div>
             <div className="mt-4 rounded-lg border border-system-border bg-white p-4">
               <EuropeFuelMap prices={europeanFuelData} euAveragePetrol={europeAverage.petrol} />
             </div>
@@ -247,7 +250,10 @@ export default async function Home() {
 
         {(europeAverage.petrol !== null || usAverage.petrol !== null) && (
           <section id="calcolatore" className="mt-12 scroll-mt-8">
-            <h2 className="text-lg font-semibold">Cosa significa in pratica</h2>
+            <div className="flex items-baseline gap-3">
+              <span className="font-mono text-xs text-system-ink-muted">02 /</span>
+              <h2 className="text-lg font-semibold text-system-ink">Cosa significa in pratica</h2>
+            </div>
             <p className="mt-1 text-sm text-system-ink-secondary">
               Quanto costa un pieno per un&apos;auto normale, e quanto pesa il
               carburante sui trasporti — camion che portano cibo, materiali,
@@ -260,7 +266,10 @@ export default async function Home() {
         )}
 
         <section id="materie-prime" className="mt-12 scroll-mt-8">
-          <h2 className="text-lg font-semibold">Materie prime globali</h2>
+          <div className="flex items-baseline gap-3">
+            <span className="font-mono text-xs text-system-ink-muted">03 /</span>
+            <h2 className="text-lg font-semibold text-system-ink">Materie prime globali</h2>
+          </div>
           {commodityPrices.length === 0 ? (
             <EmptyState label="Nessun dato ancora. Il cron job non è ancora girato per questa fonte." />
           ) : (
@@ -311,7 +320,10 @@ export default async function Home() {
         </section>
 
         <section id="carburanti" className="mt-12 scroll-mt-8">
-          <h2 className="text-lg font-semibold">Carburanti al consumo</h2>
+          <div className="flex items-baseline gap-3">
+            <span className="font-mono text-xs text-system-ink-muted">04 /</span>
+            <h2 className="text-lg font-semibold text-system-ink">Carburanti al consumo</h2>
+          </div>
           {fuelsByContinent.size === 0 ? (
             <EmptyState label="Nessun dato ancora. Il cron job non è ancora girato per questa fonte." />
           ) : (
