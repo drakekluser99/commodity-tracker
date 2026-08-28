@@ -167,7 +167,7 @@ export default async function Home() {
             <div className="min-w-0">
               <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-system-accent">
                 <ProvenanceStamp size={28} className="shrink-0 text-system-accent" />
-                Commodity Tracker · Progetto open source
+                Prezzario · Progetto open source
               </p>
               <h1 className="mt-2 text-3xl font-semibold tracking-tight">
                 Materie prime e carburanti, in tempo quasi reale
@@ -370,7 +370,7 @@ export default async function Home() {
             <div>
               <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-system-accent">
                 <ProvenanceStamp size={28} className="shrink-0 text-system-accent" />
-                Commodity Tracker
+                Prezzario
               </p>
               <p className="mt-3 text-xs leading-relaxed text-system-ink-muted">
                 Progetto open source · dati pubblici, nessuna garanzia di

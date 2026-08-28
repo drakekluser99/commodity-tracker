@@ -3,7 +3,7 @@ import { SystemCard } from "@/components/SystemCard";
 import { ProvenanceStamp } from "@/components/ProvenanceStamp";
 
 export const metadata = {
-  title: "Metodologia — Commodity Tracker",
+  title: "Metodologia — Prezzario",
 };
 
 export default function Metodologia() {

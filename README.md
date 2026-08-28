@@ -1,4 +1,4 @@
-# Commodity Tracker
+# Prezzario
 
 Progetto open source di tracciamento prezzi di materie prime globali e
 carburanti al consumo: ogni dato con la sua fonte, la sua data e i suoi limiti

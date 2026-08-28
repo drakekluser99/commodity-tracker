@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Car, Truck } from "lucide-react";
-import { SystemCard } from "@/components/SystemCard";
 
 export interface RegionFuelAverage {
   petrol: number | null;
@@ -42,11 +41,60 @@ export default function FuelImpactCalculator({ europe, us }: Props) {
   const tank = useNumericField(DEFAULT_CAR_TANK_LITERS);
   const truck = useNumericField(DEFAULT_TRUCK_CONSUMPTION);
 
-  // `eyebrow` in stile "REGIONE://" — l'estetica system-style vuole
-  // un'etichetta tipo path/terminale sopra ogni card di sintesi.
+  // Colonne della tabella: una per regione. La riga d'intestazione le nomina.
   const regions = [
-    { label: "Europa (media UE)", eyebrow: "EUROPE://", data: europe },
-    { label: "Stati Uniti", eyebrow: "US://", data: us },
+    { key: "eu", label: "Europa (media UE)", data: europe },
+    { key: "us", label: "Stati Uniti", data: us },
+  ];
+
+  // Righe della tabella comparativa: ogni riga è una metrica, ogni colonna
+  // una regione, così il confronto Europa/USA si legge sulla stessa riga
+  // invece di saltare tra due box separati. `value` riceve i dati di una
+  // regione e restituisce la cella già formattata nella sua valuta (o "—"
+  // se manca il prezzo necessario a calcolarla).
+  //
+  // Nessuna evidenziazione del "valore più conveniente": Europa è in EUR e
+  // USA in USD senza conversione, quindi marcare un numero come "più basso"
+  // sarebbe un confronto fuorviante tra valute diverse (vedi nota sotto).
+  const rows: {
+    key: string;
+    label: string;
+    icon?: ReactNode;
+    strong?: boolean;
+    value: (data: RegionFuelAverage) => string;
+  }[] = [
+    {
+      key: "petrol",
+      label: "Prezzo benzina",
+      value: (d) =>
+        d.petrol !== null ? formatPricePerLiter(d.petrol, d.currency) : "—",
+    },
+    {
+      key: "diesel",
+      label: "Prezzo diesel",
+      value: (d) =>
+        d.diesel !== null ? formatPricePerLiter(d.diesel, d.currency) : "—",
+    },
+    {
+      key: "tank",
+      label: `Pieno auto (${tank.numericValue} L)`,
+      icon: <Car size={14} />,
+      strong: true,
+      value: (d) =>
+        d.petrol !== null
+          ? formatMoney(d.petrol * tank.numericValue, d.currency)
+          : "—",
+    },
+    {
+      key: "truck",
+      label: "Costo carburante / 100 km (camion)",
+      icon: <Truck size={14} />,
+      strong: true,
+      value: (d) =>
+        d.diesel !== null
+          ? formatMoney(d.diesel * truck.numericValue, d.currency)
+          : "—",
+    },
   ];
 
   return (
@@ -82,42 +130,47 @@ export default function FuelImpactCalculator({ europe, us }: Props) {
         </label>
       </div>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        {regions.map(({ label, eyebrow, data }) => (
-          <SystemCard key={label} eyebrow={eyebrow} title={label}>
-            <div className="text-xs text-system-ink-muted">
-              {data.petrol !== null && (
-                <>Benzina {formatPricePerLiter(data.petrol, data.currency)}</>
-              )}
-              {data.petrol !== null && data.diesel !== null && " · "}
-              {data.diesel !== null && (
-                <>Diesel {formatPricePerLiter(data.diesel, data.currency)}</>
-              )}
-            </div>
-
-            <div className="mt-4 flex items-baseline justify-between">
-              <span className="flex items-center gap-1.5 text-sm text-system-ink-secondary">
-                <Car size={14} /> Pieno auto ({tank.numericValue} L)
-              </span>
-              <span className="font-mono text-lg font-semibold tabular-nums">
-                {data.petrol !== null
-                  ? formatMoney(data.petrol * tank.numericValue, data.currency)
-                  : "—"}
-              </span>
-            </div>
-
-            <div className="mt-2 flex items-baseline justify-between">
-              <span className="flex items-center gap-1.5 text-sm text-system-ink-secondary">
-                <Truck size={14} /> Costo carburante ogni 100 km guidati da un camion
-              </span>
-              <span className="font-mono text-lg font-semibold tabular-nums">
-                {data.diesel !== null
-                  ? formatMoney(data.diesel * truck.numericValue, data.currency)
-                  : "—"}
-              </span>
-            </div>
-          </SystemCard>
-        ))}
+      <div className="mt-6 overflow-x-auto">
+        <table className="w-full min-w-[440px] text-sm">
+          <thead>
+            {/* Intestazioni in stile terminale, come le altre tabelle del sito. */}
+            <tr className="border-b border-system-border text-left font-mono text-xs uppercase tracking-wider text-system-ink-secondary">
+              <th className="py-3 pr-4 font-medium">Metrica</th>
+              {regions.map((r) => (
+                <th key={r.key} className="px-4 py-3 text-right font-medium">
+                  {r.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr
+                key={row.key}
+                className="border-b border-system-border-subtle last:border-0"
+              >
+                <td className="py-3 pr-4 text-system-ink-secondary">
+                  <span className="flex items-center gap-1.5">
+                    {row.icon}
+                    {row.label}
+                  </span>
+                </td>
+                {regions.map((r) => (
+                  <td
+                    key={r.key}
+                    className={`px-4 py-3 text-right font-mono tabular-nums ${
+                      row.strong
+                        ? "text-base font-semibold text-system-ink"
+                        : "text-system-ink-secondary"
+                    }`}
+                  >
+                    {row.value(r.data)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       <div className="mt-4 space-y-2 text-xs leading-relaxed text-system-ink-muted">

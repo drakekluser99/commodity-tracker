@@ -14,21 +14,21 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://commodity-tracker-one-delta.vercel.app"),
-  title: "Commodity Tracker · Prezzi materie prime e carburanti",
+  title: "Prezzario · Prezzi materie prime e carburanti",
   description:
     "Tracciamento in tempo quasi reale di materie prime globali (petrolio, gas, metalli, agricole) e carburanti al consumo per regione. Dati pubblici, fonti verificate, nessuna garanzia di accuratezza.",
   openGraph: {
-    title: "Commodity Tracker",
+    title: "Prezzario",
     description:
       "Prezzi materie prime e carburanti, in tempo quasi reale — dati pubblici e verificati.",
     url: "https://commodity-tracker-one-delta.vercel.app",
-    siteName: "Commodity Tracker",
+    siteName: "Prezzario",
     locale: "it_IT",
     type: "website",
   },
   twitter: {
     card: "summary",
-    title: "Commodity Tracker",
+    title: "Prezzario",
     description: "Prezzi materie prime e carburanti, in tempo quasi reale.",
   },
 };
