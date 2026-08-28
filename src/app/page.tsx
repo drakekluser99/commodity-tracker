@@ -5,6 +5,7 @@ import {
   getFuelPriceHistory,
 } from "@/lib/db/queries";
 import { groupCommodityHistory, groupFuelHistory } from "@/lib/priceHistory";
+import { displayCommodityPrice } from "@/lib/commodityDisplay";
 import EuropeFuelMap from "@/components/EuropeFuelMap";
 import FuelImpactCalculator from "@/components/FuelImpactCalculator";
 import MobileNav from "@/components/MobileNav";
@@ -78,6 +79,22 @@ export default async function Home() {
       getFuelPriceHistory(thirtyDaysAgo),
     ]);
   const commoditySeries = groupCommodityHistory(commodityHistory);
+
+  // Conversione di sola visualizzazione (vedi src/lib/commodityDisplay.ts):
+  // il cotone arriva dalla fonte in "cents per pound" e va mostrato in
+  // "cents per kg". Il dato grezzo (`c.price`, `c.unit`) resta intatto —
+  // qui deriviamo solo le stringhe da rendere. Per tutte le altre materie
+  // prime `displayUnit === c.unit` e teniamo la stringa grezza così com'è,
+  // che conserva la precisione esatta del valore salvato.
+  const commodityRows = commodityPrices.map((c) => {
+    const display = displayCommodityPrice(c.symbol, parseFloat(c.price), c.unit);
+    return {
+      ...c,
+      displayPrice:
+        display.unit === c.unit ? c.price : display.price.toFixed(4),
+      displayUnit: display.unit,
+    };
+  });
   const fuelSeries = groupFuelHistory(fuelHistory);
 
   const fuelsByContinent = new Map<string, typeof fuelPrices>();
@@ -252,7 +269,7 @@ export default async function Home() {
                   </tr>
                 </thead>
                 <tbody>
-                  {commodityPrices.map((c) => (
+                  {commodityRows.map((c) => (
                     <tr key={c.symbol} className="border-b border-system-border-subtle transition-colors last:border-0 hover:bg-system-bg">
                       <td className="px-4 py-3">
                         <div className="font-medium">{c.name}</div>
@@ -262,7 +279,7 @@ export default async function Home() {
                         {CATEGORY_LABELS[c.category] ?? c.category}
                       </td>
                       <td className="px-4 py-3 text-right font-mono tabular-nums">
-                        {c.price} <span className="text-xs text-system-ink-muted">{c.unit}</span>
+                        {c.displayPrice} <span className="text-xs text-system-ink-muted">{c.displayUnit}</span>
                       </td>
                       <td className="px-4 py-3 text-right text-system-ink-muted">
                         {formatDate(c.recordedAt)}

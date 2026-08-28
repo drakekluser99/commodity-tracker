@@ -9,6 +9,8 @@
  * FuelPriceTable prima di scrivere il componente.
  */
 
+import { displayCommodityPrice } from "./commodityDisplay";
+
 export type PricePoint = { date: string; value: number };
 export type PriceSeries = { key: string; label: string; unit: string; points: PricePoint[] };
 
@@ -25,14 +27,24 @@ export function groupCommodityHistory(rows: CommodityHistoryRow[]): PriceSeries[
   const bySymbol = new Map<string, PriceSeries>();
 
   for (const row of rows) {
+    // Stessa conversione di sola visualizzazione usata nella tabella
+    // (src/lib/commodityDisplay.ts): il cotone va mostrato in cents/kg, non
+    // in cents/pound. La applichiamo qui — nel layer che prepara i dati per
+    // il grafico — e non sul dato salvato, così tabella e grafico nella
+    // stessa sezione mostrano lo stesso valore e la stessa unità.
+    const display = displayCommodityPrice(
+      row.symbol,
+      parseFloat(row.price),
+      row.unit
+    );
     let series = bySymbol.get(row.symbol);
     if (!series) {
-      series = { key: row.symbol, label: row.name, unit: row.unit, points: [] };
+      series = { key: row.symbol, label: row.name, unit: display.unit, points: [] };
       bySymbol.set(row.symbol, series);
     }
     series.points.push({
       date: formatIsoDate(row.recordedAt),
-      value: parseFloat(row.price),
+      value: display.price,
     });
   }
 
