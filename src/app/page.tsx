@@ -112,7 +112,7 @@ export default async function Home() {
   return (
     <div className="min-h-screen bg-system-bg text-system-ink">
       <header className="border-b border-system-border bg-white">
-        <div className="mx-auto max-w-screen-2xl px-6 py-8">
+        <div className="mx-auto max-w-7xl px-6 py-8">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-system-accent">
@@ -282,7 +282,7 @@ export default async function Home() {
       <footer className="relative mt-8 rounded-t-4xl border-t border-system-border bg-white">
         <div className="absolute left-1/2 right-1/2 top-0 h-px w-1/3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-r from-transparent via-system-accent/30 to-transparent blur-[1px]" />
 
-        <div className="mx-auto max-w-screen-2xl px-6 py-12">
+        <div className="mx-auto max-w-7xl px-6 py-12">
           <div className="grid gap-8 sm:grid-cols-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-system-accent">
