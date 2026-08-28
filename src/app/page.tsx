@@ -59,10 +59,16 @@ const NAV_ITEMS = [
 ];
 
 export default async function Home() {
-  // Storico ultimi 30 giorni: la finestra è fissa qui e non un parametro
-  // perché per ora c'è una sola vista. `groupCommodityHistory`/
-  // `groupFuelHistory` girano QUI, lato server — a PriceHistoryChart
-  // (Client Component) passiamo solo gli oggetti PriceSeries già pronti.
+  // Le finestre dello storico girano QUI, lato server: `groupCommodityHistory`/
+  // `groupFuelHistory` producono gli oggetti PriceSeries già pronti, e a
+  // PriceHistoryChart (Client Component) passiamo solo quelli.
+  //
+  // Perché DUE finestre diverse e non una condivisa: Alpha Vantage pubblica
+  // Brent e Natural Gas con cadenza giornaliera, ma Copper/Corn/Cotton solo
+  // mensile (o più rada). Con soli 30 giorni il grafico non intercetta
+  // nessuna rilevazione mensile e quelle serie sparivano dal selettore.
+  // 90 giorni bastano a catturarne un paio. I carburanti invece sono già
+  // tutti settimanali o più fitti: 30 giorni restano corretti per loro.
   //
   // Il disable qui sotto: questo è un Server Component async con
   // `export const dynamic = "force-dynamic"`, ri-renderizzato a ogni
@@ -70,13 +76,15 @@ export default async function Home() {
   // regola `react-hooks/purity` mira ai Client Component: qui è un falso
   // positivo.
   // eslint-disable-next-line react-hooks/purity
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const commodityHistorySince = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+  // eslint-disable-next-line react-hooks/purity
+  const fuelHistorySince = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const [commodityPrices, fuelPrices, commodityHistory, fuelHistory] =
     await Promise.all([
       getLatestCommodityPrices(),
       getLatestFuelPrices(),
-      getCommodityPriceHistory(thirtyDaysAgo),
-      getFuelPriceHistory(thirtyDaysAgo),
+      getCommodityPriceHistory(commodityHistorySince),
+      getFuelPriceHistory(fuelHistorySince),
     ]);
   const commoditySeries = groupCommodityHistory(commodityHistory);
 
@@ -292,13 +300,13 @@ export default async function Home() {
           )}
           <div className="mt-6">
             <PriceHistoryChart
-              title="Andamento materie prime (30 giorni)"
+              title="Andamento materie prime (90 giorni)"
               series={commoditySeries}
             />
           </div>
           <SourceNote>
-            Fonte: Alpha Vantage (dati di mercato) · Aggiornamento:
-            giornaliero via cron job
+            Fonte: Alpha Vantage (dati di mercato) · Aggiornamento: giornaliero
+            (petrolio, gas naturale) · mensile (metalli, agricole)
           </SourceNote>
         </section>
 
