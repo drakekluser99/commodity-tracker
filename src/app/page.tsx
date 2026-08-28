@@ -10,6 +10,7 @@ import FuelImpactCalculator from "@/components/FuelImpactCalculator";
 import MobileNav from "@/components/MobileNav";
 import { FuelPriceTable } from "@/components/FuelPriceTable";
 import { PriceHistoryChart } from "@/components/PriceHistoryChart";
+import { ProvenanceStamp } from "@/components/ProvenanceStamp";
 import { StatusLabel } from "@/components/StatusLabel";
 import Link from "next/link";
 import { Code2, Fuel, Globe2, Calculator, BarChart3 } from "lucide-react";
@@ -139,7 +140,8 @@ export default async function Home() {
         <div className="mx-auto max-w-7xl px-6 py-8">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-system-accent">
+              <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-system-accent">
+                <ProvenanceStamp size={14} className="text-system-accent" />
                 Commodity Tracker · Progetto open source
               </p>
               <h1 className="mt-2 text-3xl font-semibold tracking-tight">
@@ -321,12 +323,24 @@ export default async function Home() {
         <div className="mx-auto max-w-7xl px-6 py-12">
           <div className="grid gap-8 sm:grid-cols-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-system-accent">
+              <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-system-accent">
+                <ProvenanceStamp size={14} className="text-system-accent" />
                 Commodity Tracker
               </p>
               <p className="mt-3 text-xs leading-relaxed text-system-ink-muted">
                 Progetto open source · dati pubblici, nessuna garanzia di
                 accuratezza
+              </p>
+              <p className="mt-2 text-xs text-system-ink-muted">
+                Creato da{" "}
+                <a
+                  href="https://www.linkedin.com/in/yuri-copparini"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-system-ink-secondary transition-colors hover:text-system-accent"
+                >
+                  Yuri Copparini
+                </a>
               </p>
             </div>
 
@@ -385,9 +399,15 @@ function SourceNote({ children }: { children: React.ReactNode }) {
   // progetto: ogni dato con la sua fonte). Cambia solo lo stile: monospace
   // maiuscolo spaziato, in tinta con l'estetica system-style. `uppercase`
   // è puramente presentazionale, il testo nel DOM non cambia.
+  //
+  // Il timbro di provenienza qui davanti: le 3 note "Fonte:" sono i punti
+  // dove il principio del progetto si concretizza, quindi è dove la firma
+  // ha più senso. `items-start` + `mt-0.5` per allinearlo alla prima riga
+  // di testo anche quando la nota va a capo.
   return (
-    <p className="mt-2 font-mono text-xs uppercase tracking-wider text-system-ink-muted">
-      {children}
+    <p className="mt-2 flex items-start gap-1.5 font-mono text-xs uppercase tracking-wider text-system-ink-muted">
+      <ProvenanceStamp size={14} className="mt-0.5 shrink-0 text-system-accent" />
+      <span>{children}</span>
     </p>
   );
 }
