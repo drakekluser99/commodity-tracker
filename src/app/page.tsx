@@ -181,6 +181,12 @@ export default async function Home() {
                 value={formatDateTime(lastUpdated)}
                 live
               />
+              {/* Contesto sulla cadenza: non tutto si aggiorna alla stessa
+                  velocità, e dirlo qui in alto evita che l'utente lo scopra
+                  solo scorrendo fino alle note "Fonte:". */}
+              <p className="mt-1 text-xs text-system-ink-muted">
+                Materie prime: ogni giorno · Carburanti: settimanale
+              </p>
             </div>
           )}
 
@@ -208,7 +214,8 @@ export default async function Home() {
             </div>
             <SourceNote>
               Fonte: Bollettino Petrolifero Settimanale, Commissione Europea ·
-              Confini amministrativi: Natural Earth (dominio pubblico)
+              Aggiornamento: ogni giovedì · Confini amministrativi: Natural
+              Earth (dominio pubblico)
             </SourceNote>
           </section>
         )}
@@ -311,8 +318,9 @@ export default async function Home() {
             />
           </div>
           <SourceNote>
-            Fonte: Bollettino Petrolifero Settimanale (UE) · EIA (USA) ·
-            Prezzi medi nazionali, non punti vendita specifici
+            Fonte: Bollettino Petrolifero Settimanale (UE, ogni giovedì) ·
+            EIA (USA, ogni lunedì) · Prezzi medi nazionali, non punti vendita
+            specifici
           </SourceNote>
         </section>
       </main>
