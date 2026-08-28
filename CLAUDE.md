@@ -48,9 +48,22 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
 
 - Commenti in italiano, spiegano il "perché" non il "cosa" (il progetto
   serve anche per imparare, chi legge il codice vuole capire le scelte)
-- Palette colori: sfondo `#f7f8fa`, testo `#14181f`, accento `#0f6b66`
-  (verde petrolio, tema energia/carburanti), grigi intermedi
-  `#5b6472`/`#8891a0`, bordi `#dde1e7`/`#eef0f3`
+- Palette colori: token `system-*` definiti in `src/app/globals.css` dentro
+  `@theme` (Tailwind v4, non `tailwind.config.ts`). Non scrivere più hex a
+  mano nelle classi — usare sempre le utility generate:
+  - `system-bg` (#fafafa) — sfondo pagina
+  - `system-panel` (#f2f3f5) — sfondo pannelli secondari
+  - `system-ink` (#111318) — testo principale
+  - `system-ink-secondary` (#5b6472) — testo secondario (paragrafi, nav)
+  - `system-ink-muted` (#6b7280) — dettagli minori (text-xs, celle tabella)
+  - `system-border` (#e2e4e9) — bordi standard
+  - `system-border-subtle` (#eef0f3) — divisori più leggeri
+  - `system-accent` (#0f6b66) — verde petrolio, invariato
+  - `system-accent-down` (#b34324) — ruggine, per valori in salita
+
+  Eccezione voluta: i colori SVG grezzi dentro `EuropeFuelMap.tsx` (fill dei
+  paesi senza dati, stroke dei confini) restano hex letterali perché sono
+  attributi JS/SVG, non classi Tailwind — non vanno migrati.
 - Font numeri: sempre `font-mono tabular-nums` per allineamento colonne
 - Ogni sezione dati ha una nota "Fonte: ..." sotto (componente
   `SourceNote`) — non rimuoverle, è il principio cardine del progetto
