@@ -2,6 +2,7 @@ import { getLatestCommodityPrices, getLatestFuelPrices } from "@/lib/db/queries"
 import EuropeFuelMap from "@/components/EuropeFuelMap";
 import FuelImpactCalculator from "@/components/FuelImpactCalculator";
 import MobileNav from "@/components/MobileNav";
+import { FuelPriceTable } from "@/components/FuelPriceTable";
 import { StatusLabel } from "@/components/StatusLabel";
 import Link from "next/link";
 import { Code2, Fuel, Globe2, Calculator, BarChart3 } from "lucide-react";
@@ -111,7 +112,7 @@ export default async function Home() {
   return (
     <div className="min-h-screen bg-system-bg text-system-ink">
       <header className="border-b border-system-border bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-8">
+        <div className="mx-auto max-w-screen-2xl px-6 py-8">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-system-accent">
@@ -172,7 +173,7 @@ export default async function Home() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-6 py-10">
+      <main className="mx-auto max-w-screen-2xl px-6 py-10">
         {europeanFuelData.length > 0 && (
           <section id="mappa" className="scroll-mt-8">
             <h2 className="text-lg font-semibold">Prezzo benzina in Europa</h2>
@@ -252,45 +253,22 @@ export default async function Home() {
           ) : (
             <div className="mt-4 space-y-6">
               {Array.from(fuelsByContinent.entries()).map(([continent, fuels]) => (
-                <div key={continent} className="overflow-hidden rounded-lg border border-system-border bg-white">
-                  <div className="border-b border-system-border bg-system-bg px-4 py-2 text-xs font-semibold uppercase tracking-wide text-system-ink-secondary">
-                    {CONTINENT_LABELS[continent] ?? continent}
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[480px] text-sm">
-                      <thead>
-                        {/* Intestazioni in stile terminale: monospace + maiuscolo
-                      spaziato, per coerenza con le card system-style. */}
-                  <tr className="border-b border-system-border text-left font-mono text-xs uppercase tracking-wider text-system-ink-secondary">
-                          <th className="px-4 py-3 font-medium">Regione</th>
-                          <th className="px-4 py-3 font-medium">Carburante</th>
-                          <th className="px-4 py-3 text-right font-medium">Prezzo / litro</th>
-                          <th className="px-4 py-3 text-right font-medium">Data</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {fuels.map((f) => (
-                          <tr
-                            key={`${f.regionName}-${f.fuelType}`}
-                            className="border-b border-system-border-subtle transition-colors last:border-0 hover:bg-system-bg"
-                          >
-                            <td className="px-4 py-3">{f.regionName}</td>
-                            <td className="px-4 py-3 text-system-ink-secondary capitalize">
-                              {f.fuelType === "petrol" ? "Benzina" : "Diesel"}
-                            </td>
-                            <td className="px-4 py-3 text-right font-mono tabular-nums">
-                              {parseFloat(f.price).toFixed(3)}{" "}
-                              <span className="text-xs text-system-ink-muted">{f.currency}</span>
-                            </td>
-                            <td className="px-4 py-3 text-right text-system-ink-muted">
-                              {formatDate(f.recordedAt)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                <FuelPriceTable
+                  key={continent}
+                  continentLabel={CONTINENT_LABELS[continent] ?? continent}
+                  fuels={fuels.map((f) => ({
+                    regionName: f.regionName,
+                    // Il layer DB tipa fuelType come `string`; lo schema
+                    // ammette solo "petrol"/"diesel" (retail_fuel_prices),
+                    // quindi restringiamo qui al confine col componente.
+                    fuelType: f.fuelType as "petrol" | "diesel",
+                    price: f.price,
+                    currency: f.currency,
+                    // formatDate() gira QUI, lato server: passiamo la stringa
+                    // risultante, mai la funzione (Client Component).
+                    recordedAtFormatted: formatDate(f.recordedAt),
+                  }))}
+                />
               ))}
             </div>
           )}
@@ -304,7 +282,7 @@ export default async function Home() {
       <footer className="relative mt-8 rounded-t-4xl border-t border-system-border bg-white">
         <div className="absolute left-1/2 right-1/2 top-0 h-px w-1/3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-r from-transparent via-system-accent/30 to-transparent blur-[1px]" />
 
-        <div className="mx-auto max-w-7xl px-6 py-12">
+        <div className="mx-auto max-w-screen-2xl px-6 py-12">
           <div className="grid gap-8 sm:grid-cols-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-system-accent">
