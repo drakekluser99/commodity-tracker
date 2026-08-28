@@ -165,8 +165,8 @@ export default async function Home() {
         <div className="mx-auto max-w-screen-2xl px-6 py-8">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <p className="flex items-start gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-system-accent">
-                <ProvenanceStamp size={20} className="mt-0.5 shrink-0 text-system-accent" />
+              <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-system-accent">
+                <ProvenanceStamp size={28} className="shrink-0 text-system-accent" />
                 Commodity Tracker · Progetto open source
               </p>
               <h1 className="mt-2 text-3xl font-semibold tracking-tight">
@@ -368,8 +368,8 @@ export default async function Home() {
         <div className="mx-auto max-w-screen-2xl px-6 py-12">
           <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
             <div>
-              <p className="flex items-start gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-system-accent">
-                <ProvenanceStamp size={20} className="mt-0.5 shrink-0 text-system-accent" />
+              <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-system-accent">
+                <ProvenanceStamp size={28} className="shrink-0 text-system-accent" />
                 Commodity Tracker
               </p>
               <p className="mt-3 text-xs leading-relaxed text-system-ink-muted">

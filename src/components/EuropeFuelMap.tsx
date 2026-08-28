@@ -61,7 +61,7 @@ export default function EuropeFuelMap({ prices, euAveragePetrol }: Props) {
                 // (lo stesso che alimenta il tooltip), NON dallo pseudo-stato
                 // CSS :hover di react-simple-maps. Su touch il :hover nativo
                 // resta "incollato" all'ultimo elemento toccato: il tooltip
-                // (stato React) si aggiornava ma il bordo nero no. Usando
+                // (stato React) si aggiornava ma il bordo evidenziato no. Usando
                 // `isHovered` sia in `default` che in `hover` il risultato è
                 // identico qualunque pseudo-stato il browser applichi.
                 const isHovered = hovered?.countryName === name;
@@ -83,14 +83,18 @@ export default function EuropeFuelMap({ prices, euAveragePetrol }: Props) {
                     style={{
                       default: {
                         fill: t !== null ? interpolateColor(t) : "#eef0f3",
-                        stroke: isHovered ? "#14181f" : "#ffffff",
+                        stroke: isHovered
+                          ? "var(--color-system-accent)"
+                          : "#ffffff",
                         strokeWidth: isHovered ? 1 : 0.5,
                         outline: "none",
                         cursor: data ? "pointer" : "default",
                       },
                       hover: {
                         fill: t !== null ? interpolateColor(t) : "#eef0f3",
-                        stroke: isHovered ? "#14181f" : "#ffffff",
+                        stroke: isHovered
+                          ? "var(--color-system-accent)"
+                          : "#ffffff",
                         strokeWidth: isHovered ? 1 : 0.5,
                         outline: "none",
                         cursor: data ? "pointer" : "default",
