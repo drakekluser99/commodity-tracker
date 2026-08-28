@@ -1,4 +1,4 @@
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, gte } from "drizzle-orm";
 import { db } from "./client";
 import { commodities, priceHistory, regions, retailFuelPrices } from "./schema";
 
@@ -81,4 +81,63 @@ export async function getLatestFuelPrices(): Promise<LatestFuelPrice[]> {
     latest.push(row);
   }
   return latest;
+}
+
+export interface CommodityHistoryRow {
+  symbol: string;
+  name: string;
+  unit: string;
+  price: string;
+  recordedAt: Date;
+}
+
+/**
+ * Tutto lo storico prezzi materie prime a partire da una data (inclusa),
+ * ordinato dal più vecchio al più recente per essere pronto da plottare.
+ * A differenza di getLatestCommodityPrices non deduplichiamo: qui servono
+ * proprio tutte le rilevazioni nel tempo.
+ */
+export async function getCommodityPriceHistory(
+  sinceDate: Date
+): Promise<CommodityHistoryRow[]> {
+  return db
+    .select({
+      symbol: commodities.symbol,
+      name: commodities.name,
+      unit: commodities.unit,
+      price: priceHistory.price,
+      recordedAt: priceHistory.recordedAt,
+    })
+    .from(priceHistory)
+    .innerJoin(commodities, eq(priceHistory.commodityId, commodities.id))
+    .where(gte(priceHistory.recordedAt, sinceDate))
+    .orderBy(priceHistory.recordedAt);
+}
+
+export interface FuelHistoryRow {
+  regionName: string;
+  continent: string;
+  fuelType: string;
+  price: string;
+  currency: string;
+  recordedAt: Date;
+}
+
+/** Stessa logica di getCommodityPriceHistory, per i carburanti regionali. */
+export async function getFuelPriceHistory(
+  sinceDate: Date
+): Promise<FuelHistoryRow[]> {
+  return db
+    .select({
+      regionName: regions.name,
+      continent: regions.continent,
+      fuelType: retailFuelPrices.fuelType,
+      price: retailFuelPrices.price,
+      currency: retailFuelPrices.currency,
+      recordedAt: retailFuelPrices.recordedAt,
+    })
+    .from(retailFuelPrices)
+    .innerJoin(regions, eq(retailFuelPrices.regionId, regions.id))
+    .where(gte(retailFuelPrices.recordedAt, sinceDate))
+    .orderBy(retailFuelPrices.recordedAt);
 }

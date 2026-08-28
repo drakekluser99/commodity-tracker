@@ -1,8 +1,15 @@
-import { getLatestCommodityPrices, getLatestFuelPrices } from "@/lib/db/queries";
+import {
+  getLatestCommodityPrices,
+  getLatestFuelPrices,
+  getCommodityPriceHistory,
+  getFuelPriceHistory,
+} from "@/lib/db/queries";
+import { groupCommodityHistory, groupFuelHistory } from "@/lib/priceHistory";
 import EuropeFuelMap from "@/components/EuropeFuelMap";
 import FuelImpactCalculator from "@/components/FuelImpactCalculator";
 import MobileNav from "@/components/MobileNav";
 import { FuelPriceTable } from "@/components/FuelPriceTable";
+import { PriceHistoryChart } from "@/components/PriceHistoryChart";
 import { StatusLabel } from "@/components/StatusLabel";
 import Link from "next/link";
 import { Code2, Fuel, Globe2, Calculator, BarChart3 } from "lucide-react";
@@ -50,10 +57,27 @@ const NAV_ITEMS = [
 ];
 
 export default async function Home() {
-  const [commodityPrices, fuelPrices] = await Promise.all([
-    getLatestCommodityPrices(),
-    getLatestFuelPrices(),
-  ]);
+  // Storico ultimi 30 giorni: la finestra è fissa qui e non un parametro
+  // perché per ora c'è una sola vista. `groupCommodityHistory`/
+  // `groupFuelHistory` girano QUI, lato server — a PriceHistoryChart
+  // (Client Component) passiamo solo gli oggetti PriceSeries già pronti.
+  //
+  // Il disable qui sotto: questo è un Server Component async con
+  // `export const dynamic = "force-dynamic"`, ri-renderizzato a ogni
+  // richiesta — un timestamp "ora" è esattamente ciò che vogliamo. La
+  // regola `react-hooks/purity` mira ai Client Component: qui è un falso
+  // positivo.
+  // eslint-disable-next-line react-hooks/purity
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const [commodityPrices, fuelPrices, commodityHistory, fuelHistory] =
+    await Promise.all([
+      getLatestCommodityPrices(),
+      getLatestFuelPrices(),
+      getCommodityPriceHistory(thirtyDaysAgo),
+      getFuelPriceHistory(thirtyDaysAgo),
+    ]);
+  const commoditySeries = groupCommodityHistory(commodityHistory);
+  const fuelSeries = groupFuelHistory(fuelHistory);
 
   const fuelsByContinent = new Map<string, typeof fuelPrices>();
   for (const fuel of fuelPrices) {
@@ -240,6 +264,12 @@ export default async function Home() {
               </table>
             </div>
           )}
+          <div className="mt-6">
+            <PriceHistoryChart
+              title="Andamento materie prime (30 giorni)"
+              series={commoditySeries}
+            />
+          </div>
           <SourceNote>
             Fonte: Alpha Vantage (dati di mercato) · Aggiornamento:
             giornaliero via cron job
@@ -272,6 +302,12 @@ export default async function Home() {
               ))}
             </div>
           )}
+          <div className="mt-6">
+            <PriceHistoryChart
+              title="Andamento carburanti (30 giorni)"
+              series={fuelSeries}
+            />
+          </div>
           <SourceNote>
             Fonte: Bollettino Petrolifero Settimanale (UE) · EIA (USA) ·
             Prezzi medi nazionali, non punti vendita specifici

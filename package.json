@@ -21,7 +21,8 @@
     "next": "16.3.3",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "react-simple-maps": "^3.0.0"
+    "react-simple-maps": "^3.0.0",
+    "recharts": "^3.10.1"
   },
   "overrides": {
     "d3-color": "^3.1.0"
