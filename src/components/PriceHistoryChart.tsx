@@ -133,7 +133,8 @@ export function PriceHistoryChart({
       </div>
 
       <p className="mt-2 text-xs text-system-ink-muted">
-        Unità: {selected.unit} · {selected.points.length} rilevazioni nel periodo
+        Unità: {selected.unit} · {selected.points.length}{" "}
+        {selected.points.length === 1 ? "rilevazione" : "rilevazioni"} nel periodo
       </p>
     </div>
   );
