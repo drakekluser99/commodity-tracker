@@ -154,11 +154,11 @@ export default async function Home() {
   return (
     <div className="min-h-screen bg-system-bg text-system-ink">
       <header className="border-b border-system-border bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-8">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-system-accent">
-                <ProvenanceStamp size={14} className="text-system-accent" />
+        <div className="mx-auto max-w-screen-2xl px-6 py-8">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="flex items-start gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-system-accent">
+                <ProvenanceStamp size={20} className="mt-0.5 shrink-0 text-system-accent" />
                 Commodity Tracker · Progetto open source
               </p>
               <h1 className="mt-2 text-3xl font-semibold tracking-tight">
@@ -171,7 +171,7 @@ export default async function Home() {
                 giorno.
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2">
               <a
                 href={GITHUB_URL}
                 target="_blank"
@@ -345,27 +345,16 @@ export default async function Home() {
       <footer className="relative mt-8 rounded-t-4xl border-t border-system-border bg-white">
         <div className="absolute left-1/2 right-1/2 top-0 h-px w-1/3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-r from-transparent via-system-accent/30 to-transparent blur-[1px]" />
 
-        <div className="mx-auto max-w-7xl px-6 py-12">
-          <div className="grid gap-8 sm:grid-cols-3">
+        <div className="mx-auto max-w-screen-2xl px-6 py-12">
+          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
             <div>
-              <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-system-accent">
-                <ProvenanceStamp size={14} className="text-system-accent" />
+              <p className="flex items-start gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-system-accent">
+                <ProvenanceStamp size={20} className="mt-0.5 shrink-0 text-system-accent" />
                 Commodity Tracker
               </p>
               <p className="mt-3 text-xs leading-relaxed text-system-ink-muted">
                 Progetto open source · dati pubblici, nessuna garanzia di
                 accuratezza
-              </p>
-              <p className="mt-2 text-xs text-system-ink-muted">
-                Creato da{" "}
-                <a
-                  href="https://www.linkedin.com/in/yuri-copparini"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-system-ink-secondary transition-colors hover:text-system-accent"
-                >
-                  Yuri Copparini
-                </a>
               </p>
             </div>
 
@@ -411,6 +400,22 @@ export default async function Home() {
                   </a>
                 </li>
               </ul>
+            </div>
+
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-system-ink-secondary">
+                Autore
+              </h3>
+              <p className="mt-3 text-sm">
+                <a
+                  href="https://www.linkedin.com/in/yuri-copparini"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-system-ink-secondary transition-colors hover:text-system-accent"
+                >
+                  Yuri Copparini
+                </a>
+              </p>
             </div>
           </div>
         </div>

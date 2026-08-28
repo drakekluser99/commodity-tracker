@@ -103,8 +103,8 @@ export function FuelPriceTable({
         </span>
 
         {needsControls && (
-          <div className="flex items-center gap-3">
-            <div className="relative">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <div className="relative w-full sm:w-auto">
               <Search
                 className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-system-ink-muted"
                 aria-hidden="true"
@@ -115,7 +115,7 @@ export function FuelPriceTable({
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Cerca paese..."
                 aria-label={`Cerca paese in ${continentLabel}`}
-                className="rounded-md border border-system-border bg-white py-1 pl-7 pr-2 text-xs text-system-ink placeholder:text-system-ink-muted focus:border-system-accent focus:outline-none"
+                className="w-full rounded-md border border-system-border bg-white py-1 pl-7 pr-2 text-xs text-system-ink placeholder:text-system-ink-muted focus:border-system-accent focus:outline-none sm:w-auto"
               />
             </div>
             {searchedRegions === null && (
