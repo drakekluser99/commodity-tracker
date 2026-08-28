@@ -1,6 +1,9 @@
 @AGENTS.md
 
-# Commodity Tracker — contesto del progetto
+# Prezzario — contesto del progetto
+
+(Nome visualizzato del sito: "Prezzario". Il repository GitHub resta
+`commodity-tracker`, così come i nomi di file e le variabili interne.)
 
 Progetto open source che raccoglie e mostra prezzi di materie prime globali
 e carburanti al consumo, ispirato nello spirito (non nei contenuti) a

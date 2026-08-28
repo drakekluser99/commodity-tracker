@@ -21,6 +21,10 @@ function formatMoney(value: number, currency: string): string {
   return new Intl.NumberFormat("it-IT", {
     style: "currency",
     currency,
+    // Senza questo, per USD in locale it-IT ICU stampa il codice ISO
+    // ("53,96 USD") invece del simbolo. `narrowSymbol` forza "$" / "€",
+    // coerente con formatPricePerLiter qui sotto.
+    currencyDisplay: "narrowSymbol",
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
