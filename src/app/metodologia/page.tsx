@@ -103,6 +103,66 @@ export default function Metodologia() {
             o contribuire con miglioramenti.
           </p>
         </Section>
+
+        <Section index="05" title="API pubblica">
+          <p className="text-sm leading-relaxed text-system-ink-secondary">
+            Gli stessi ultimi prezzi mostrati sulla dashboard sono
+            disponibili in JSON, per riusarli in altri progetti:
+          </p>
+          <p className="mt-3">
+            <code className="rounded border border-system-border bg-system-panel px-2 py-1 font-mono text-xs text-system-ink">
+              GET https://commodity-tracker-one-delta.vercel.app/api/data
+            </code>
+          </p>
+          <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-relaxed text-system-ink-secondary">
+            <li>
+              Nessuna autenticazione. Header{" "}
+              <code className="font-mono text-xs">
+                Access-Control-Allow-Origin: *
+              </code>
+              , quindi si può chiamare anche da un browser di terze parti.
+            </li>
+            <li>
+              I prezzi sono i valori <strong>grezzi</strong> come salvati
+              dalla fonte: nessuna conversione di visualizzazione (il
+              cotone resta in <code className="font-mono text-xs">cents per
+              pound</code>, non cents/kg come in tabella).
+            </li>
+            <li>
+              <code className="font-mono text-xs">price</code> è numerico;
+              le date sono ISO 8601 in UTC. Risposta rigenerata a ogni
+              richiesta.
+            </li>
+          </ul>
+          <p className="mt-3 text-sm leading-relaxed text-system-ink-secondary">
+            Esempio di risposta (abbreviata):
+          </p>
+          <pre className="mt-2 overflow-x-auto rounded-md border border-system-border bg-system-panel p-4 font-mono text-xs leading-relaxed text-system-ink-secondary">
+{`{
+  "generatedAt": "2026-08-31T12:00:00.000Z",
+  "commodities": [
+    {
+      "symbol": "BRENT",
+      "name": "Brent Crude Oil",
+      "category": "energy",
+      "price": 88.24,
+      "unit": "dollars per barrel",
+      "recordedAt": "2026-08-25T00:00:00.000Z"
+    }
+  ],
+  "fuelPrices": [
+    {
+      "region": "Italy",
+      "continent": "europe",
+      "fuelType": "petrol",
+      "price": 2.003,
+      "currency": "EUR",
+      "recordedAt": "2026-08-24T00:00:00.000Z"
+    }
+  ]
+}`}
+          </pre>
+        </Section>
       </main>
 
       <footer className="mx-auto max-w-3xl px-6 py-10 text-xs text-system-ink-muted">
