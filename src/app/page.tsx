@@ -255,14 +255,13 @@ export default async function Home() {
           </div>
 
           {lastUpdated && (
-            // Ex "Ultimo aggiornamento: ...": ora un'etichetta system-style
-            // con pallino di stato. `live` perché il dato è aggiornato di
-            // recente via cron; il valore resta la data formattata in italiano.
+            // Ex "Ultimo aggiornamento: ...": un'etichetta system-style con
+            // pallino di stato statico (i dati non sono uno stream) e la
+            // data dell'ultimo valore salvato, formattata in italiano.
             <div className="mt-4">
               <StatusLabel
-                label="MARKET DATA"
+                label="ULTIMO DATO"
                 value={formatDateTime(lastUpdated)}
-                live
               />
               {/* Contesto sulla cadenza: non tutto si aggiorna alla stessa
                   velocità, e dirlo qui in alto evita che l'utente lo scopra
