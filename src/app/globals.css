@@ -1,6 +1,10 @@
 @import "tailwindcss";
 
 :root {
+  /* Prezzario è light-only per scelta (palette chiara, stile open-data).
+     `color-scheme: light` lo dichiara esplicitamente così anche i controlli
+     nativi (input, scrollbar) restano chiari sui browser in dark mode. */
+  color-scheme: light;
   --background: #ffffff;
   --foreground: #171717;
 }
@@ -61,13 +65,6 @@
   --color-system-border-strong: #111318;
   --color-system-accent: #0f6b66;
   --color-system-accent-down: #b34324;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
