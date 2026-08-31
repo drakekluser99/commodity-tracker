@@ -15,6 +15,9 @@ export async function savePricePoints(
   points: NormalizedPricePoint[],
   source: string
 ) {
+  // Un solo timestamp per l'intero batch: è un unico evento di
+  // acquisizione. Distinto da `recordedAt` (la data del dato).
+  const retrievedAt = new Date();
   let saved = 0;
 
   for (const point of points) {
@@ -45,11 +48,14 @@ export async function savePricePoints(
         commodityId: commodity.id,
         price: point.price.toString(), // `numeric` di Postgres si passa come stringa via Drizzle
         recordedAt: new Date(point.date),
+        retrievedAt,
         source,
       })
       .onConflictDoUpdate({
         target: [priceHistory.commodityId, priceHistory.recordedAt],
-        set: { price: point.price.toString(), source },
+        // Anche se il valore è identico, ri-vederlo dalla fonte è una
+        // nuova acquisizione: aggiorniamo `retrievedAt`.
+        set: { price: point.price.toString(), retrievedAt, source },
       });
 
     saved++;

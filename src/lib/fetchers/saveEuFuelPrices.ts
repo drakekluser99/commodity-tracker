@@ -11,6 +11,9 @@ export async function saveEuFuelPrices(
   points: EuFuelPricePoint[],
   source: string
 ) {
+  // Un solo timestamp di acquisizione per l'intero run (vedi
+  // savePricePoints): distinto da `recordedAt`, la data del dato.
+  const retrievedAt = new Date();
   let saved = 0;
 
   for (const point of points) {
@@ -46,6 +49,7 @@ export async function saveEuFuelPrices(
         currency: point.currency,
         unit: "liter",
         recordedAt: new Date(point.date),
+        retrievedAt,
         source,
       })
       .onConflictDoUpdate({
@@ -57,6 +61,7 @@ export async function saveEuFuelPrices(
         set: {
           price: point.pricePerLiter.toString(),
           currency: point.currency,
+          retrievedAt,
           source,
         },
       });

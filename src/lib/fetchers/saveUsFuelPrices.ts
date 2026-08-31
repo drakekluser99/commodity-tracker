@@ -28,6 +28,8 @@ export async function saveUsFuelPrices(
     throw new Error("Impossibile risolvere la regione United States");
   }
 
+  // Timestamp di acquisizione unico per il run (vedi savePricePoints).
+  const retrievedAt = new Date();
   let saved = 0;
   for (const point of points) {
     // Upsert sul vincolo unique (region_id, fuel_type, recorded_at):
@@ -42,6 +44,7 @@ export async function saveUsFuelPrices(
         currency: point.currency,
         unit: "liter",
         recordedAt: new Date(point.date),
+        retrievedAt,
         source,
       })
       .onConflictDoUpdate({
@@ -53,6 +56,7 @@ export async function saveUsFuelPrices(
         set: {
           price: point.pricePerLiter.toString(),
           currency: point.currency,
+          retrievedAt,
           source,
         },
       });

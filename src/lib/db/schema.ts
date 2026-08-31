@@ -42,7 +42,14 @@ export const priceHistory = pgTable(
       .references(() => commodities.id),
     // `numeric` invece di `float`: evita errori di arrotondamento sui prezzi
     price: numeric("price", { precision: 12, scale: 4 }).notNull(),
+    // `recorded_at` è la data DEL DATO (a quale giornata si riferisce il
+    // prezzo). `retrieved_at` è quando il nostro fetcher l'ha acquisito:
+    // due cose diverse, es. un prezzo mensile datato 01/07 acquisito il
+    // 20/07. Serve a distinguere "fonte ferma" da "fonte che non ha
+    // ancora pubblicato". Nullable: le righe salvate prima di questa
+    // colonna hanno acquisizione non tracciata.
     recordedAt: timestamp("recorded_at").notNull().defaultNow(),
+    retrievedAt: timestamp("retrieved_at"),
     source: varchar("source", { length: 64 }).notNull(), // es. "alpha_vantage"
   },
   (table) => ({
@@ -93,7 +100,9 @@ export const retailFuelPrices = pgTable(
     price: numeric("price", { precision: 10, scale: 4 }).notNull(),
     currency: varchar("currency", { length: 3 }).notNull(), // ISO 4217, es. "EUR", "USD"
     unit: varchar("unit", { length: 16 }).notNull().default("liter"), // "liter" | "gallon"
+    // Vedi price_history.retrievedAt: data del dato vs data di acquisizione.
     recordedAt: timestamp("recorded_at").notNull().defaultNow(),
+    retrievedAt: timestamp("retrieved_at"),
     source: varchar("source", { length: 64 }).notNull(), // es. "eu_weekly_oil_bulletin", "eia_us"
   },
   (table) => ({
