@@ -33,7 +33,10 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   `retail_fuel_prices` hanno sia `recorded_at` (data DEL DATO) sia
   `retrieved_at` (quando il fetcher l'ha acquisito, nullable): due cose
   diverse, servono per distinguere "fonte ferma" da "fonte che non ha
-  ancora pubblicato"
+  ancora pubblicato". Migrazioni applicate al DB Neon fino alla `0004`
+  (31 ago 2026): `retrieved_at` è `NULL` per le righe salvate prima di
+  allora e si popola dal primo run successivo di ogni cron; `fetch_runs`
+  parte vuota e si riempie allo stesso modo
 - `src/lib/db/queries.ts` — query di lettura (ultimo prezzo per ogni
   commodity/regione). NON filtrano per data (vedi "Errori noti")
 - `src/lib/commodityFreshness.ts` — calcola l'età dell'ultimo prezzo di
