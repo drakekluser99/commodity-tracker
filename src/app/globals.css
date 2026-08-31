@@ -73,5 +73,11 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  /* Geist Sans (caricato in layout.tsx come `--font-geist-sans`) come font
+     di interfaccia. Prima qui c'era `Arial, Helvetica` letterale, che
+     vinceva su Geist: il font importato non veniva mai usato per il testo
+     del body. Geist Mono resta per prezzi/date/unità via l'utility
+     `font-mono`. */
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
+    sans-serif;
 }
