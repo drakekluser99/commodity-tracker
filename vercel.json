@@ -1,12 +1,24 @@
 {
   "crons": [
     {
-      "path": "/api/cron/fetch-market-prices-a",
+      "path": "/api/cron/fetch-market-prices-1",
       "schedule": "0 6 * * *"
     },
     {
-      "path": "/api/cron/fetch-market-prices-b",
-      "schedule": "0 7 * * *"
+      "path": "/api/cron/fetch-market-prices-2",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/fetch-market-prices-3",
+      "schedule": "0 10 * * *"
+    },
+    {
+      "path": "/api/cron/fetch-market-prices-4",
+      "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/fetch-market-prices-5",
+      "schedule": "0 14 * * *"
     },
     {
       "path": "/api/cron/fetch-eu-fuel-prices",

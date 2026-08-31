@@ -100,40 +100,54 @@ async function fetchOne(
   };
 }
 
-// Dividiamo il paniere in due batch da 5. Perché non facciamo tutte e 10
-// le chiamate in un colpo solo? Due motivi:
-// 1. Vercel Hobby limita le funzioni serverless a 10 secondi di esecuzione:
-//    un solo cron con pause per rispettare i rate limit richiederebbe più
-//    di un minuto e andrebbe in timeout.
-// 2. Vercel Hobby permette solo 2 cron job per progetto, una volta al giorno:
-//    quindi li usiamo entrambi, uno per batch, invece di uno solo enorme.
-export const COMMODITY_BATCH_A = TRACKED_COMMODITIES.slice(0, 5); // energia + metalli
-export const COMMODITY_BATCH_B = TRACKED_COMMODITIES.slice(5); // agricole
+// Dividiamo le 10 materie prime in 5 batch da 2. Storia di questa scelta:
+// prima erano 2 batch da 5 chiamati con Promise.all (tutte le richieste in
+// parallelo). Sembrava dentro il limite "5 richieste/minuto" di Alpha
+// Vantage, ma in pratica 5 connessioni simultanee ne facevano fallire
+// 1-2 con una risposta di rate limit (HTTP 200 + campo "Information"),
+// silenziosamente: Aluminum, Sugar e Coffee non sono MAI stati salvati.
+// Il limite reale sembra essere anche sulle connessioni simultanee, non
+// solo sul conteggio nel tempo. Ora: batch piccoli, chiamate SEQUENZIALI
+// con pausa, e un cron per batch su ORE diverse (vedi vercel.json) — su
+// Vercel Hobby i cron hanno precisione oraria (±59 min), quindi distanziare
+// di pochi minuti non servirebbe: servono ore diverse.
+export const COMMODITY_BATCH_1 = TRACKED_COMMODITIES.slice(0, 2); // WTI, BRENT
+export const COMMODITY_BATCH_2 = TRACKED_COMMODITIES.slice(2, 4); // NATURAL_GAS, COPPER
+export const COMMODITY_BATCH_3 = TRACKED_COMMODITIES.slice(4, 6); // ALUMINUM, WHEAT
+export const COMMODITY_BATCH_4 = TRACKED_COMMODITIES.slice(6, 8); // CORN, COTTON
+export const COMMODITY_BATCH_5 = TRACKED_COMMODITIES.slice(8, 10); // SUGAR, COFFEE
+
+// Pausa fra una chiamata e la successiva dentro lo stesso batch. Due
+// secondi sono un'assicurazione a basso costo contro il limite di
+// connessioni simultanee: con 2 sole chiamate per batch la funzione
+// resta comunque ben sotto i 10s di `maxDuration`.
+const PAUSE_BETWEEN_CALLS_MS = 2000;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Recupera un batch di materie prime IN PARALLELO (Promise.all).
- * Con batch da 5 elementi restiamo sotto il limite di 5 richieste/minuto
- * di Alpha Vantage, e l'intera chiamata finisce in 1-2 secondi:
- * ampiamente dentro il limite di 10s di Vercel Hobby.
+ * Recupera un batch di materie prime IN SEQUENZA, con una pausa fra una
+ * chiamata e l'altra. Non usiamo più Promise.all/allSettled: le richieste
+ * parallele sono esattamente ciò che sforava il rate limit di Alpha
+ * Vantage. Se UNA chiamata fallisce (throw o risposta anomala) le altre
+ * proseguono comunque: non perdiamo l'intero batch per un singolo errore.
  */
 export async function fetchCommodityBatch(
   batch: readonly (typeof TRACKED_COMMODITIES)[number][],
   apiKey: string
 ): Promise<NormalizedPricePoint[]> {
-  // Promise.all lancia tutte le richieste insieme e aspetta che finiscano
-  // tutte. Usiamo Promise.allSettled invece di Promise.all "puro" perché
-  // se UNA chiamata fallisce, vogliamo comunque salvare i dati delle altre
-  // invece di perdere tutto il batch.
-  const settled = await Promise.allSettled(
-    batch.map((commodity) => fetchOne(commodity, apiKey))
-  );
-
   const results: NormalizedPricePoint[] = [];
-  for (const outcome of settled) {
-    if (outcome.status === "fulfilled" && outcome.value) {
-      results.push(outcome.value);
-    } else if (outcome.status === "rejected") {
-      console.error("Errore nel recupero di una commodity:", outcome.reason);
+
+  for (let i = 0; i < batch.length; i++) {
+    if (i > 0) await sleep(PAUSE_BETWEEN_CALLS_MS);
+    try {
+      const point = await fetchOne(batch[i], apiKey);
+      if (point) results.push(point);
+    } catch (err) {
+      console.error(
+        `Errore nel recupero di ${batch[i].symbol}:`,
+        err
+      );
     }
   }
 

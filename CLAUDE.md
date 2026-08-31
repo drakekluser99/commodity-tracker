@@ -27,16 +27,24 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
 - `src/lib/db/queries.ts` — query di lettura (ultimo prezzo per ogni
   commodity/regione)
 - `src/lib/fetchers/` — un fetcher per fonte dati:
-  - `alphaVantage.ts` — API REST, materie prime globali, batch A
-    (energia+metalli) e B (agricole) per rispettare il limite di 10s
-    delle funzioni serverless su Vercel Hobby e i rate limit gratuiti
-    della API
+  - `alphaVantage.ts` — API REST, materie prime globali, 10 simboli
+    divisi in 5 batch da 2 (`COMMODITY_BATCH_1`…`_5`). Le chiamate
+    dentro un batch sono SEQUENZIALI con pausa di 2s: le richieste
+    parallele sforavano il rate limit gratuito della API (anche sulle
+    connessioni simultanee, non solo sul conteggio). `fetchOne` logga
+    con `console.error` le risposte anomale (campo `Information`/`Note`/
+    `Error Message` al posto di `data`) invece di ingoiarle
   - `euOilBulletin.ts` — scarica e parsa un file XLSX della Commissione
     Europea (bollettino settimanale carburanti), parsing DIFENSIVO per
     nome colonna (non posizione), validato contro dati reali
   - `eiaUs.ts` — API REST EIA (governo USA), carburanti settimanali
-- `src/app/api/cron/*/route.ts` — 4 route protette da `CRON_SECRET`
-  (header `Authorization: Bearer`), schedulate in `vercel.json`
+- `src/app/api/cron/*/route.ts` — 7 route protette da `CRON_SECRET`
+  (header `Authorization: Bearer`), schedulate in `vercel.json`:
+  `fetch-market-prices-1`…`-5` (materie prime, ogni batch a un'ora
+  diversa: 06/08/10/12/14 UTC — su Hobby i cron hanno precisione
+  oraria ±59min, quindi vanno distanziati di ore non di minuti),
+  `fetch-eu-fuel-prices` (giovedì), `fetch-us-fuel-prices` (lunedì).
+  Il limite Hobby è 100 cron job/progetto, uno al giorno ciascuno
 - `src/app/page.tsx` — homepage: dashboard con mappa Europa, calcolatore
   d'impatto, tabelle materie prime/carburanti
 - `src/app/metodologia/page.tsx` — pagina trasparenza (fonti, limiti,
@@ -89,6 +97,19 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   verificare se c'è un fix non-breaking prima di ignorarlo; se il fix
   richiede un downgrade breaking e il rischio non è applicabile al
   nostro uso, documentarlo nel commit invece di lasciarlo silenzioso
+- **Alpha Vantage + parallelo = rate limit silenzioso**: chiamare più
+  endpoint commodity in parallelo (`Promise.all`) fa tornare ad alcune
+  richieste `{"Information": "..."}` con HTTP 200 al posto di `data`.
+  Vanno fatte SEQUENZIALI con pausa. Il free tier è ~25 richieste/giorno
+  + limite sulle connessioni simultanee. Bug originale: Aluminum/Sugar/
+  Coffee mai salvate perché erano gli ultimi del batch parallelo
+- **Cron su Vercel Hobby**: precisione solo oraria (±59 min) e massimo
+  una esecuzione al giorno per cron. Per distanziare davvero due job
+  servono ORE diverse nello `schedule`, non minuti. Espressioni
+  sotto-giornaliere (`*/30 * * * *`, `0 * * * *`) fanno FALLIRE il deploy
+- `getLatestCommodityPrices`/`getLatestFuelPrices` non filtrano per data:
+  mostrano l'ultimo valore salvato "per sempre", anche se vecchio di
+  mesi. Se una commodity smette di aggiornarsi il sito non lo segnala
 
 ## Workflow con l'utente
 

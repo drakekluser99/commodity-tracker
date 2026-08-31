@@ -8,11 +8,11 @@ import { savePricePoints } from "./savePricePoints";
 type Commodity = (typeof TRACKED_COMMODITIES)[number];
 
 /**
- * Logica condivisa da entrambe le route del cron (batch A e batch B):
- * autentica la richiesta, chiama Alpha Vantage per il batch passato,
- * salva i risultati nel database. Le due route (`route.ts` in
- * fetch-market-prices-a/ e -b/) sono solo un sottile wrapper che
- * sceglie quale batch passare qui.
+ * Logica condivisa dalle 5 route del cron materie prime
+ * (fetch-market-prices-1 … -5): autentica la richiesta, chiama Alpha
+ * Vantage per il batch passato, salva i risultati nel database. Ogni
+ * `route.ts` è solo un sottile wrapper che sceglie quale batch passare
+ * qui e con quale etichetta (per i log).
  */
 export async function runMarketPriceCron(
   request: NextRequest,
