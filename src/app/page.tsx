@@ -225,17 +225,24 @@ export default async function Home() {
             </div>
           )}
 
-          <nav className="mt-6 hidden flex-wrap gap-1 border-t border-system-border-subtle pt-4 sm:flex">
-            {NAV_ITEMS.map(({ href, label, icon: Icon }) => (
-              <a
-                key={href}
-                href={href}
-                className="flex items-center gap-1.5 rounded-md border border-system-border px-3 py-1.5 font-mono text-xs uppercase tracking-wider text-system-ink-secondary transition-colors hover:border-system-accent hover:bg-system-bg hover:text-system-accent"
-              >
-                <Icon size={14} />
-                {label}
-              </a>
-            ))}
+          {/* Barra di navigazione "tab bar": un solo contenitore con bordo
+              unico e divisori verticali (border-l) fra le voci, invece di
+              pillole separate da spazio vuoto. `overflow-hidden` sul
+              contenitore ritaglia gli angoli arrotondati delle voci agli
+              estremi; `first:border-l-0` toglie il divisore iniziale. */}
+          <nav className="mt-6 hidden border-t border-system-border-subtle pt-4 sm:block">
+            <div className="inline-flex overflow-hidden rounded-md border border-system-border">
+              {NAV_ITEMS.map(({ href, label, icon: Icon }) => (
+                <a
+                  key={href}
+                  href={href}
+                  className="flex items-center gap-1.5 border-l border-system-border px-3.5 py-2 font-mono text-xs uppercase tracking-wider text-system-ink-secondary transition-colors first:border-l-0 hover:bg-system-bg hover:text-system-accent"
+                >
+                  <Icon size={14} />
+                  {label}
+                </a>
+              ))}
+            </div>
           </nav>
         </div>
       </header>
