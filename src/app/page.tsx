@@ -4,7 +4,7 @@ import {
   getCommodityPriceHistory,
   getFuelPriceHistory,
 } from "@/lib/db/queries";
-import { groupCommodityHistory, groupFuelHistory } from "@/lib/priceHistory";
+import { groupCommodityHistory, groupFuelHistory, priceMovers } from "@/lib/priceHistory";
 import { displayCommodityPrice } from "@/lib/commodityDisplay";
 import { commodityFreshness } from "@/lib/commodityFreshness";
 import EuropeFuelMap from "@/components/EuropeFuelMap";
@@ -16,7 +16,15 @@ import { PriceHistoryChart } from "@/components/PriceHistoryChart";
 import { ProvenanceStamp } from "@/components/ProvenanceStamp";
 import { StatusLabel } from "@/components/StatusLabel";
 import Link from "next/link";
-import { Code2, Fuel, Globe2, Calculator, BarChart3 } from "lucide-react";
+import {
+  Code2,
+  Fuel,
+  Globe2,
+  Calculator,
+  BarChart3,
+  ArrowUpRight,
+  ArrowDownRight,
+} from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -138,6 +146,18 @@ export default async function Home() {
     data: c.recordedAt.toISOString().slice(0, 10),
   }));
   const fuelSeries = groupFuelHistory(fuelHistory);
+
+  // "Maggiori variazioni": prime/ultime rilevazioni di ogni serie. Le due
+  // fonti hanno finestre diverse (materie prime 90gg, carburanti 30gg):
+  // ce lo portiamo dietro per riga così la sezione può dichiararlo invece
+  // di far credere a un confronto sullo stesso periodo. Ordine per
+  // ampiezza assoluta della variazione, prime 5.
+  const topMovers = [
+    ...priceMovers(commoditySeries).map((m) => ({ ...m, windowDays: 90 })),
+    ...priceMovers(fuelSeries).map((m) => ({ ...m, windowDays: 30 })),
+  ]
+    .sort((a, b) => Math.abs(b.changePct) - Math.abs(a.changePct))
+    .slice(0, 5);
 
   const fuelsByContinent = new Map<string, typeof fuelPrices>();
   for (const fuel of fuelPrices) {
@@ -272,6 +292,74 @@ export default async function Home() {
       </header>
 
       <main className="mx-auto max-w-screen-2xl px-6 py-10">
+        {/* "Maggiori variazioni": riepilogo in cima, senza numero di
+            sezione — è una sintesi dei dati che seguono, non una quinta
+            sezione dell'indice 01–04. */}
+        {topMovers.length > 0 && (
+          <section className="mb-12">
+            <div className="flex items-baseline gap-3">
+              <span className="font-mono text-xs text-system-ink-muted">◆</span>
+              <h2 className="text-lg font-semibold text-system-ink">
+                Maggiori variazioni
+              </h2>
+            </div>
+            <p className="mt-1 text-sm text-system-ink-secondary">
+              Scostamento tra la prima e l&apos;ultima rilevazione nella
+              finestra dei grafici qui sotto — materie prime 90 giorni,
+              carburanti 30 giorni.
+            </p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {topMovers.map((m) => {
+                // In salita = ruggine, in discesa = verde: stessa lettura
+                // del colore usata nella mappa ("più caro" ruggine) e
+                // documentata in globals.css.
+                const up = m.changePct >= 0;
+                return (
+                  <div
+                    key={m.key}
+                    className="rounded-lg border border-system-border bg-white p-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="truncate font-medium text-system-ink">
+                          {m.label}
+                        </div>
+                        <div className="mt-0.5 font-mono text-xs tabular-nums text-system-ink-muted">
+                          {m.first.toFixed(2)} → {m.last.toFixed(2)} {m.unit}
+                        </div>
+                      </div>
+                      <div
+                        className={`flex shrink-0 items-center gap-1 font-mono font-semibold tabular-nums ${
+                          up
+                            ? "text-system-accent-down"
+                            : "text-system-accent"
+                        }`}
+                      >
+                        {up ? (
+                          <ArrowUpRight size={16} />
+                        ) : (
+                          <ArrowDownRight size={16} />
+                        )}
+                        {up ? "+" : ""}
+                        {m.changePct.toFixed(1)}%
+                      </div>
+                    </div>
+                    <div className="mt-2 font-mono text-[11px] uppercase tracking-wider text-system-ink-muted">
+                      {m.windowDays} giorni · {m.points} rilevazioni
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <SourceNote>
+              Fonte: come le rispettive sezioni (Alpha Vantage per le materie
+              prime, Commissione Europea ed EIA per i carburanti) · variazione
+              calcolata sui soli dati disponibili nella finestra, non
+              sull&apos;intero storico
+            </SourceNote>
+          </section>
+        )}
+
         {europeanFuelData.length > 0 && (
           <section id="mappa" className="scroll-mt-8">
             <div className="flex items-baseline gap-3">

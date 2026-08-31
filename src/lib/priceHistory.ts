@@ -135,3 +135,55 @@ function formatIsoDate(value: Date | string): string {
   const d = typeof value === "string" ? new Date(value) : value;
   return d.toISOString().slice(0, 10); // "2026-08-24"
 }
+
+export type PriceMover = {
+  key: string;
+  label: string;
+  unit: string;
+  /** Primo valore disponibile nella finestra (punto più vecchio) */
+  first: number;
+  /** Ultimo valore disponibile nella finestra (punto più recente) */
+  last: number;
+  /** Variazione percentuale tra `first` e `last` (può essere negativa) */
+  changePct: number;
+  firstDate: string;
+  lastDate: string;
+  /** Rilevazioni nella finestra: utile per dire quanto è "solida" la variazione */
+  points: number;
+};
+
+/**
+ * Variazione percentuale tra la prima e l'ultima rilevazione di ogni
+ * serie, per la sezione "Maggiori variazioni" in homepage.
+ *
+ * I `points` di ogni PriceSeries sono già ordinati per data crescente
+ * (le query fanno `ORDER BY recorded_at`, e groupFuelHistory ri-ordina),
+ * quindi `points[0]` è il più vecchio e l'ultimo è il più recente.
+ *
+ * Salta le serie con meno di 2 punti (nessuna variazione calcolabile —
+ * capita spesso alle materie prime mensili, che in 90 giorni hanno a
+ * volte una sola rilevazione) e quelle con primo valore 0 (divisione non
+ * definita). NON ordina né taglia la lista: se ne occupa il chiamante,
+ * che sa quante voci vuole e se mescolare più fonti.
+ */
+export function priceMovers(series: PriceSeries[]): PriceMover[] {
+  const movers: PriceMover[] = [];
+  for (const s of series) {
+    if (s.points.length < 2) continue;
+    const first = s.points[0];
+    const last = s.points[s.points.length - 1];
+    if (first.value === 0) continue;
+    movers.push({
+      key: s.key,
+      label: s.label,
+      unit: s.unit,
+      first: first.value,
+      last: last.value,
+      changePct: ((last.value - first.value) / first.value) * 100,
+      firstDate: first.date,
+      lastDate: last.date,
+      points: s.points.length,
+    });
+  }
+  return movers;
+}
