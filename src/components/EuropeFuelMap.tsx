@@ -36,19 +36,40 @@ export default function EuropeFuelMap({ prices, euAveragePetrol }: Props) {
 
   const dataByCountry = new Map(prices.map((p) => [p.countryName, p]));
 
-  const petrolValues = prices
-    .map((p) => p.petrol)
-    .filter((v): v is number => v !== null);
+  const withPetrol = prices.filter(
+    (p): p is CountryFuelData & { petrol: number } => p.petrol !== null
+  );
+  const petrolValues = withPetrol.map((p) => p.petrol);
   const min = Math.min(...petrolValues);
   const max = Math.max(...petrolValues);
+
+  // Estremi calcolati dai dati, mostrati come etichette fisse sulla mappa
+  // (non solo nel tooltip al passaggio del mouse): sono l'informazione che
+  // l'utente cerca per prima. `reduce` invece di sort per non allocare un
+  // nuovo array.
+  const cheapest = withPetrol.reduce<(CountryFuelData & { petrol: number }) | null>(
+    (best, p) => (best === null || p.petrol < best.petrol ? p : best),
+    null
+  );
+  const priciest = withPetrol.reduce<(CountryFuelData & { petrol: number }) | null>(
+    (best, p) => (best === null || p.petrol > best.petrol ? p : best),
+    null
+  );
 
   return (
     <div className="relative">
       <ComposableMap
         projection="geoAzimuthalEqualArea"
-        projectionConfig={{ rotate: [-15, -52, 0], scale: 700 }}
+        // Inquadratura più stretta sull'Europa con dati: centro spostato a
+        // 13°E / 50°N e scala 900 (era rotate [-15,-52], scale 700),
+        // viewBox più basso (490 invece di 520). Riduce il vuoto grigio a
+        // est (Russia, Ucraina, Turchia — paesi senza dati) e l'oceano
+        // atlantico, tenendo dentro Portogallo, Finlandia, Grecia. Cipro e
+        // Malta restano vicini al bordo sud-est: visibili trascinando la
+        // mappa, e Malta compare comunque nelle etichette degli estremi.
+        projectionConfig={{ rotate: [-13, -50, 0], scale: 900 }}
         width={800}
-        height={520}
+        height={490}
         style={{ width: "100%", height: "auto" }}
       >
         <ZoomableGroup center={[0, 0]} zoom={1} minZoom={1} maxZoom={5}>
@@ -111,6 +132,39 @@ export default function EuropeFuelMap({ prices, euAveragePetrol }: Props) {
           </Geographies>
         </ZoomableGroup>
       </ComposableMap>
+
+      {/* Etichette fisse con gli estremi, in alto a destra (il tooltip
+          hover sta in alto a sinistra, così non si sovrappongono). */}
+      {cheapest && priciest && (
+        <div className="pointer-events-none absolute right-3 top-3 flex flex-col gap-1.5 text-xs">
+          <div className="rounded-md border border-system-border bg-white/90 px-2.5 py-1.5 shadow-sm backdrop-blur-sm">
+            <div className="font-mono uppercase tracking-wider text-system-ink-muted">
+              Più economico
+            </div>
+            <div className="mt-0.5 flex items-baseline justify-between gap-3">
+              <span className="font-medium text-system-ink">
+                {cheapest.countryName}
+              </span>
+              <span className="font-mono tabular-nums text-system-accent">
+                {cheapest.petrol.toFixed(3)} €/L
+              </span>
+            </div>
+          </div>
+          <div className="rounded-md border border-system-border bg-white/90 px-2.5 py-1.5 shadow-sm backdrop-blur-sm">
+            <div className="font-mono uppercase tracking-wider text-system-ink-muted">
+              Più caro
+            </div>
+            <div className="mt-0.5 flex items-baseline justify-between gap-3">
+              <span className="font-medium text-system-ink">
+                {priciest.countryName}
+              </span>
+              <span className="font-mono tabular-nums text-system-accent-down">
+                {priciest.petrol.toFixed(3)} €/L
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {hovered && (
         <div className="pointer-events-none absolute left-4 top-4 rounded-md border border-system-border bg-white px-3 py-2 text-sm shadow-md">
