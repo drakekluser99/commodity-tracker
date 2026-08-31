@@ -11,6 +11,7 @@ import EuropeFuelMap from "@/components/EuropeFuelMap";
 import FuelImpactCalculator from "@/components/FuelImpactCalculator";
 import MobileNav from "@/components/MobileNav";
 import { FuelPriceTable } from "@/components/FuelPriceTable";
+import { DownloadDataButtons } from "@/components/DownloadDataButtons";
 import { PriceHistoryChart } from "@/components/PriceHistoryChart";
 import { ProvenanceStamp } from "@/components/ProvenanceStamp";
 import { StatusLabel } from "@/components/StatusLabel";
@@ -54,6 +55,17 @@ function formatDateTime(date: Date): string {
     minute: "2-digit",
   }).format(date);
 }
+
+// Colonne dell'export della tabella materie prime. Le chiavi diventano
+// le colonne del CSV e i campi del JSON; l'ordine qui è l'ordine nel file.
+const COMMODITY_EXPORT_COLUMNS = [
+  { key: "materia_prima", label: "Materia prima" },
+  { key: "simbolo", label: "Simbolo" },
+  { key: "categoria", label: "Categoria" },
+  { key: "prezzo", label: "Prezzo" },
+  { key: "unita", label: "Unità" },
+  { key: "data", label: "Data" },
+];
 
 const NAV_ITEMS = [
   { href: "#mappa", label: "Mappa", icon: Globe2 },
@@ -113,6 +125,18 @@ export default async function Home() {
       freshness: commodityFreshness(c.recordedAt, c.category, now),
     };
   });
+
+  // Righe pronte per l'export (CSV/JSON lato client). Prezzo e unità sono
+  // quelli di visualizzazione (già convertiti dove serve, es. cotone in
+  // cents/kg); la data in ISO per essere ordinabile/parsabile.
+  const commodityExportRows = commodityRows.map((c) => ({
+    materia_prima: c.name,
+    simbolo: c.symbol,
+    categoria: CATEGORY_LABELS[c.category] ?? c.category,
+    prezzo: c.displayPrice,
+    unita: c.displayUnit,
+    data: c.recordedAt.toISOString().slice(0, 10),
+  }));
   const fuelSeries = groupFuelHistory(fuelHistory);
 
   const fuelsByContinent = new Map<string, typeof fuelPrices>();
@@ -283,9 +307,18 @@ export default async function Home() {
         )}
 
         <section id="materie-prime" className="mt-12 scroll-mt-8">
-          <div className="flex items-baseline gap-3">
-            <span className="font-mono text-xs text-system-ink-muted">03 /</span>
-            <h2 className="text-lg font-semibold text-system-ink">Materie prime globali</h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-baseline gap-3">
+              <span className="font-mono text-xs text-system-ink-muted">03 /</span>
+              <h2 className="text-lg font-semibold text-system-ink">Materie prime globali</h2>
+            </div>
+            {commodityRows.length > 0 && (
+              <DownloadDataButtons
+                filenameBase="prezzario-materie-prime"
+                columns={COMMODITY_EXPORT_COLUMNS}
+                rows={commodityExportRows}
+              />
+            )}
           </div>
           {commodityPrices.length === 0 ? (
             <EmptyState label="Nessun dato ancora. Il cron job non è ancora girato per questa fonte." />

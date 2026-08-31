@@ -2,6 +2,16 @@
 
 import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
+import { DownloadDataButtons } from "./DownloadDataButtons";
+
+// Colonne dell'export (CSV/JSON). Ordine = ordine nel file.
+const FUEL_EXPORT_COLUMNS = [
+  { key: "paese", label: "Paese" },
+  { key: "carburante", label: "Carburante" },
+  { key: "prezzo_litro", label: "Prezzo/litro" },
+  { key: "valuta", label: "Valuta" },
+  { key: "data", label: "Data" },
+];
 
 export type FuelRow = {
   regionName: string;
@@ -65,6 +75,23 @@ export function FuelPriceTable({
       .sort((a, b) => a.avgPrice - b.avgPrice);
   }, [fuels]);
 
+  // Tutte le righe del continente, nell'ordine più economico → più caro,
+  // pronte per l'export. Indipendente da ricerca/espansione: il file
+  // contiene sempre il dataset completo mostrato in questa tabella.
+  const exportRows = useMemo(
+    () =>
+      regions.flatMap(({ regionName, rows }) =>
+        rows.map((f) => ({
+          paese: regionName,
+          carburante: f.fuelType === "petrol" ? "Benzina" : "Diesel",
+          prezzo_litro: parseFloat(f.price).toFixed(3),
+          valuta: f.currency,
+          data: f.recordedAtFormatted,
+        })),
+      ),
+    [regions],
+  );
+
   const totalRegions = regions.length;
   // Se ci sono pochi paesi (es. Nord America con solo gli USA), la ricerca
   // e il pulsante "mostra tutti" sarebbero inutili: mostriamo tutto senza
@@ -98,9 +125,18 @@ export function FuelPriceTable({
   return (
     <div className="overflow-hidden rounded-lg border border-system-border bg-white">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-system-border bg-system-bg px-4 py-2">
-        <span className="text-xs font-semibold uppercase tracking-wide text-system-ink-secondary">
-          {continentLabel}
-        </span>
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-xs font-semibold uppercase tracking-wide text-system-ink-secondary">
+            {continentLabel}
+          </span>
+          <DownloadDataButtons
+            filenameBase={`prezzario-carburanti-${continentLabel
+              .toLowerCase()
+              .replace(/\s+/g, "-")}`}
+            columns={FUEL_EXPORT_COLUMNS}
+            rows={exportRows}
+          />
+        </div>
 
         {needsControls && (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
