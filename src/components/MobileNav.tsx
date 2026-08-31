@@ -35,7 +35,14 @@ export default function MobileNav({ items, githubUrl }: Props) {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-20 mt-2 w-56 rounded-lg border border-system-border bg-white py-2 shadow-lg">
+        /* Stesso trattamento "tab bar connessa" del menu desktop, ma in
+           verticale: un solo contenitore con bordo esterno unico e divisori
+           sottili (border-t, first:border-t-0) fra le voci invece di
+           spaziatura vuota. `overflow-hidden` ritaglia l'hover agli angoli
+           arrotondati; niente padding verticale sul contenitore così i
+           divisori arrivano ai bordi. Hover coerente col desktop
+           (bg-system-bg + testo accent). */
+        <div className="absolute right-0 top-full z-20 mt-2 w-56 overflow-hidden rounded-lg border border-system-border bg-white shadow-lg">
           {items.map(({ href, label }) => {
             const Icon = ICONS[href] ?? Globe2;
             return (
@@ -43,20 +50,19 @@ export default function MobileNav({ items, githubUrl }: Props) {
                 key={href}
                 href={href}
                 onClick={() => setOpen(false)}
-                className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-system-ink-secondary transition-colors hover:bg-system-bg hover:text-system-accent"
+                className="flex items-center gap-2.5 border-t border-system-border px-4 py-2.5 text-sm text-system-ink-secondary transition-colors first:border-t-0 hover:bg-system-bg hover:text-system-accent"
               >
                 <Icon size={15} />
                 {label}
               </a>
             );
           })}
-          <div className="my-1 border-t border-system-border-subtle" />
           <a
             href={githubUrl}
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => setOpen(false)}
-            className="block px-4 py-2.5 text-sm text-system-ink-secondary transition-colors hover:bg-system-bg hover:text-system-accent"
+            className="block border-t border-system-border px-4 py-2.5 text-sm text-system-ink-secondary transition-colors hover:bg-system-bg hover:text-system-accent"
           >
             Codice sorgente
           </a>
