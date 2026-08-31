@@ -245,6 +245,10 @@ export default async function Home() {
               </a>
               <MobileNav
                 items={NAV_ITEMS.map(({ href, label }) => ({ href, label }))}
+                pageLinks={[
+                  { href: "/metodologia", label: "Metodologia" },
+                  { href: "/glossario", label: "Glossario" },
+                ]}
                 githubUrl={GITHUB_URL}
               />
             </div>
@@ -568,6 +572,14 @@ export default async function Home() {
                     className="text-system-ink-secondary transition-colors hover:text-system-accent"
                   >
                     Metodologia
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/glossario"
+                    className="text-system-ink-secondary transition-colors hover:text-system-accent"
+                  >
+                    Glossario
                   </Link>
                 </li>
                 <li>

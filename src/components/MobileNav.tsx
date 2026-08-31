@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Menu, X, Globe2, Calculator, BarChart3, Fuel } from "lucide-react";
 
 interface NavItem {
@@ -9,7 +10,10 @@ interface NavItem {
 }
 
 interface Props {
+  /** Ancore alla stessa pagina (sezioni della dashboard) */
   items: NavItem[];
+  /** Link ad altre pagine del sito (Metodologia, Glossario) */
+  pageLinks: NavItem[];
   githubUrl: string;
 }
 
@@ -20,7 +24,7 @@ const ICONS: Record<string, typeof Globe2> = {
   "#carburanti": Fuel,
 };
 
-export default function MobileNav({ items, githubUrl }: Props) {
+export default function MobileNav({ items, pageLinks, githubUrl }: Props) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -57,6 +61,16 @@ export default function MobileNav({ items, githubUrl }: Props) {
               </a>
             );
           })}
+          {pageLinks.map(({ href, label }) => (
+            <Link
+              key={href}
+              href={href}
+              onClick={() => setOpen(false)}
+              className="block border-t border-system-border px-4 py-2.5 text-sm text-system-ink-secondary transition-colors hover:bg-system-bg hover:text-system-accent"
+            >
+              {label}
+            </Link>
+          ))}
           <a
             href={githubUrl}
             target="_blank"
