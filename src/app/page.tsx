@@ -6,6 +6,7 @@ import {
 } from "@/lib/db/queries";
 import { groupCommodityHistory, groupFuelHistory } from "@/lib/priceHistory";
 import { displayCommodityPrice } from "@/lib/commodityDisplay";
+import { commodityFreshness } from "@/lib/commodityFreshness";
 import EuropeFuelMap from "@/components/EuropeFuelMap";
 import FuelImpactCalculator from "@/components/FuelImpactCalculator";
 import MobileNav from "@/components/MobileNav";
@@ -91,6 +92,11 @@ export default async function Home() {
     ]);
   const commoditySeries = groupCommodityHistory(commodityHistory);
 
+  // Timestamp unico per il calcolo di freschezza di tutte le righe (vedi
+  // src/lib/commodityFreshness.ts). Server Component force-dynamic,
+  // ri-renderizzato a ogni richiesta: "ora" è esattamente ciò che serve.
+  const now = new Date();
+
   // Conversione di sola visualizzazione (vedi src/lib/commodityDisplay.ts):
   // il cotone arriva dalla fonte in "cents per pound" e va mostrato in
   // "cents per kg". Il dato grezzo (`c.price`, `c.unit`) resta intatto —
@@ -104,6 +110,7 @@ export default async function Home() {
       displayPrice:
         display.unit === c.unit ? c.price : display.price.toFixed(4),
       displayUnit: display.unit,
+      freshness: commodityFreshness(c.recordedAt, c.category, now),
     };
   });
   const fuelSeries = groupFuelHistory(fuelHistory);
@@ -302,7 +309,21 @@ export default async function Home() {
                         {c.displayPrice} <span className="text-xs text-system-ink-muted">{c.displayUnit}</span>
                       </td>
                       <td className="px-4 py-3 text-right text-system-ink-muted">
-                        {formatDate(c.recordedAt)}
+                        <span className="inline-flex items-center gap-2">
+                          {c.freshness.stale && (
+                            <span
+                              title={`Ultimo dato ${c.freshness.ageDays} giorni fa. La fonte aggiorna questa serie ${
+                                c.freshness.cadence === "daily"
+                                  ? "ogni giorno di mercato"
+                                  : "una volta al mese"
+                              }: il valore mostrato potrebbe non essere quello corrente.`}
+                              className="rounded border border-system-accent-down/40 px-1.5 py-0.5 font-mono text-[10px] uppercase leading-none tracking-wider text-system-accent-down"
+                            >
+                              non aggiornato
+                            </span>
+                          )}
+                          {formatDate(c.recordedAt)}
+                        </span>
                       </td>
                     </tr>
                   ))}
@@ -318,7 +339,9 @@ export default async function Home() {
           </div>
           <SourceNote>
             Fonte: Alpha Vantage (dati di mercato) · Aggiornamento: giornaliero
-            (petrolio, gas naturale) · mensile (metalli, agricole)
+            (petrolio, gas naturale) · mensile (metalli, agricole) · il badge
+            &quot;non aggiornato&quot; segnala una serie ferma oltre il ritardo
+            atteso per la sua cadenza
           </SourceNote>
         </section>
 

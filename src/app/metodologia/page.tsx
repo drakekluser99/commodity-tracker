@@ -58,6 +58,14 @@ export default function Metodologia() {
             minuto per minuto — il titolo &quot;in tempo quasi reale&quot; si
             riferisce a questo: aggiornati regolarmente, non istantanei.
           </p>
+          <p className="mt-3 text-sm leading-relaxed text-system-ink-secondary">
+            Quando una serie di materie prime resta ferma oltre il ritardo
+            atteso per la sua cadenza (14 giorni per le giornaliere, 75 per
+            le mensili), nella tabella compare un badge{" "}
+            <strong>&quot;non aggiornato&quot;</strong> accanto alla data: il
+            valore mostrato è l&apos;ultimo che abbiamo, ma potrebbe non
+            essere quello corrente.
+          </p>
         </Section>
 
         <Section index="03" title="Limiti da conoscere">
