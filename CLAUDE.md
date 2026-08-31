@@ -21,12 +21,19 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
 
 ## Architettura
 
-- `src/lib/db/schema.ts` — 4 tabelle: `commodities`, `price_history`
+- `src/lib/db/schema.ts` — 5 tabelle: `commodities`, `price_history`
   (materie prime globali), `regions`, `retail_fuel_prices` (carburanti
-  per regione). `price_history` ha un `uniqueIndex` su
-  `(commodity_id, recorded_at)` e `retail_fuel_prices` uno su
-  `(region_id, fuel_type, recorded_at)`: sono il bersaglio dell'upsert
-  nei fetcher, evitano righe duplicate a ogni run del cron
+  per regione), `fetch_runs` (esiti dei cron di acquisizione).
+  `price_history` ha un `uniqueIndex` su `(commodity_id, recorded_at)` e
+  `retail_fuel_prices` uno su `(region_id, fuel_type, recorded_at)`: sono
+  il bersaglio dell'upsert nei fetcher, evitano righe duplicate a ogni
+  run del cron. Le colonne FK (`commodity_id`, `region_id`) sono
+  `integer`, non `serial` (erano `serial`: sequence + `DEFAULT nextval()`
+  inutili su una FK — corretto in migrazione `0002`). `price_history` e
+  `retail_fuel_prices` hanno sia `recorded_at` (data DEL DATO) sia
+  `retrieved_at` (quando il fetcher l'ha acquisito, nullable): due cose
+  diverse, servono per distinguere "fonte ferma" da "fonte che non ha
+  ancora pubblicato"
 - `src/lib/db/queries.ts` — query di lettura (ultimo prezzo per ogni
   commodity/regione). NON filtrano per data (vedi "Errori noti")
 - `src/lib/commodityFreshness.ts` — calcola l'età dell'ultimo prezzo di
@@ -36,6 +43,14 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
 - `src/lib/commodityDisplay.ts` — conversioni di SOLA visualizzazione
   (es. cotone da cents/pound a cents/kg); il dato grezzo salvato non si
   tocca mai
+- `src/lib/format.ts` — formattazione per la UI italiana: numeri con
+  separatori it-IT (`13.542,82`), unità/valute abbreviate (`$/barile`,
+  `$/t`, `€/L`), percentuali col segno e minus tipografico. Mappa unità
+  esplicita con fallback alla stringa originale (niente perdita
+  silenziosa). Usato da tabella materie prime, `FuelPriceTable`, card
+  "Maggiori variazioni", `FuelImpactCalculator`. Il dato grezzo NON si
+  tocca (DB/export/API invariati); l'unità originale della fonte resta
+  nel `title` della cella
 - `src/lib/priceHistory.ts` — trasforma le righe grezze di storico in
   serie pronte per il grafico: `groupCommodityHistory` (una serie per
   simbolo), `groupFuelHistory` (continente × carburante, media UE sui
@@ -57,14 +72,24 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   - `eiaUs.ts` — API REST EIA (governo USA), carburanti settimanali
   - `savePricePoints.ts` / `saveEuFuelPrices.ts` / `saveUsFuelPrices.ts`
     — persistenza. Usano `onConflictDoUpdate` sul vincolo unique: se la
-    fonte ripropone la stessa data aggiornano il prezzo, non duplicano
+    fonte ripropone la stessa data aggiornano il prezzo, non duplicano.
+    Valorizzano `retrieved_at` con un timestamp unico per run (aggiornato
+    anche sul re-fetch dello stesso dato)
+  - `fetchRunLog.ts` — `startFetchRun` / `finishFetchRun`: registrano
+    l'esito di ogni run in `fetch_runs`. Regola: il logging NON fa mai
+    fallire il fetch (try/catch interno; `startFetchRun` torna `null` se
+    il DB è giù, `finishFetchRun` no-op su `null`)
 - `src/app/api/cron/*/route.ts` — 7 route protette da `CRON_SECRET`
   (header `Authorization: Bearer`), schedulate in `vercel.json`:
   `fetch-market-prices-1`…`-5` (materie prime, ogni batch a un'ora
   diversa: 06/08/10/12/14 UTC — su Hobby i cron hanno precisione
   oraria ±59min, quindi vanno distanziati di ore non di minuti),
   `fetch-eu-fuel-prices` (giovedì), `fetch-us-fuel-prices` (lunedì).
-  Il limite Hobby è 100 cron job/progetto, uno al giorno ciascuno
+  Il limite Hobby è 100 cron job/progetto, uno al giorno ciascuno.
+  Ogni route (via `runMarketPriceCron` o direttamente) apre e chiude un
+  record in `fetch_runs`. `ok: true` = "run finita senza eccezioni", NON
+  "tutto salvato": `points_saved` sotto l'atteso (es. rate limit Alpha
+  Vantage a HTTP 200) è il segnale da leggere a valle
 - `src/app/api/data/route.ts` — endpoint pubblico `GET /api/data`: JSON
   con gli ultimi prezzi (stessi dati della homepage, da `queries.ts`).
   CORS aperto (`Access-Control-Allow-Origin: *`) + handler `OPTIONS`
@@ -78,14 +103,18 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   Europa, calcolatore d'impatto, tabelle materie prime/carburanti. Ogni
   tabella ha i pulsanti "Scarica CSV/JSON" (`DownloadDataButtons`). Nav
   header = "tab bar" connessa (contenitore unico + `border-l` tra le
-  voci). Footer con divisori `border-l` tra le colonne (solo `lg`);
-  colonna "Progetto" con Metodologia + Glossario. Tabella materie prime:
-  badge "non aggiornato" nella colonna Data (da `commodityFreshness.ts`).
-  `LinkedinGlyph` è una SVG inline (lucide non ha icone brand)
+  voci). Contenuto a `max-w-7xl` (1280px). Footer piatto (bordo
+  superiore, niente `rounded-t-*` né gradiente decorativo), divisori
+  `border-l` tra le colonne (solo `lg`); colonna "Progetto" con
+  Metodologia + Glossario. Tabella materie prime: badge "non aggiornato"
+  nella colonna Data (da `commodityFreshness.ts`). `StatusLabel`
+  ("ULTIMO DATO · <data>") ha un pallino STATICO — niente animazione, i
+  dati non sono uno stream. `LinkedinGlyph` è una SVG inline (lucide non
+  ha icone brand)
 - `src/app/metodologia/page.tsx` — pagina trasparenza (fonti, limiti,
-  frequenza aggiornamento). Spiega anche il badge "non aggiornato" e
-  documenta l'API pubblica `/api/data` (sezione 05, con esempio di
-  risposta)
+  frequenza aggiornamento, licenza MIT). Spiega anche il badge "non
+  aggiornato" e documenta l'API pubblica `/api/data` (sezione 05, con
+  esempio di risposta)
 - `src/app/glossario/page.tsx` — pagina FAQ/glossario (WTI vs Brent,
   Weekly Oil Bulletin, EIA, cadenza giornaliera vs mensile, badge "non
   aggiornato" → rimanda a metodologia). Stesso pattern di
@@ -112,6 +141,17 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
 
 - Commenti in italiano, spiegano il "perché" non il "cosa" (il progetto
   serve anche per imparare, chi legge il codice vuole capire le scelte)
+- Font: `body` usa Geist Sans (`var(--font-geist-sans)`, caricato in
+  `layout.tsx`); `font-mono` (Geist Mono) per prezzi, date, unità, codici.
+  NON rimettere `Arial` letterale sul body (vinceva su Geist).
+- Il sito è **light-only** per scelta: `globals.css` ha `color-scheme:
+  light` e nessun blocco `prefers-color-scheme: dark`. Non aggiungere un
+  dark mode parziale (ribaltare `--background` senza ridefinire i token
+  `system-*` lascia body scuro e pannelli chiari).
+- Formattazione di numeri/unità/valute nella UI: sempre via
+  `src/lib/format.ts` (separatori it-IT). Mai `toFixed` col punto nei
+  componenti. Il dato grezzo (DB, `/api/data`, export CSV/JSON) NON si
+  formatta; l'unità originale della fonte va tenuta nel `title`.
 - Palette colori: token `system-*` definiti in `src/app/globals.css` dentro
   `@theme` (Tailwind v4, non `tailwind.config.ts`). Non scrivere più hex a
   mano nelle classi — usare sempre le utility generate:
@@ -150,6 +190,17 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
 - `drizzle-kit` non legge `.env.local` di default (è una convenzione
   solo di Next.js) — `drizzle.config.ts` lo carica esplicitamente con
   `dotenv`
+- **Colonne FK: usare `integer`, non `serial`.** `serial` aggiunge una
+  sequence e un `DEFAULT nextval()` che su una chiave esterna non
+  servono e mascherano un INSERT senza valore. Inoltre `drizzle-kit
+  generate` NON rileva il passaggio `serial`→`integer` (genera solo un
+  `SET DATA TYPE` no-op): il `DROP DEFAULT` va aggiunto a mano alla
+  migrazione (vedi `0002`)
+- **Migrazioni non automatiche**: dopo aver toccato `schema.ts`,
+  `npm run db:generate` crea il file SQL, `npm run db:migrate` lo applica
+  al DB Neon. Il deploy su Vercel NON esegue le migrazioni. I save dei
+  fetcher includono le colonne nuove nella query: se il DB è indietro
+  rispetto allo schema, i cron falliscono
 - Vulnerabilità dipendenze: quando `npm audit` segnala qualcosa,
   verificare se c'è un fix non-breaking prima di ignorarlo; se il fix
   richiede un downgrade breaking e il rischio non è applicabile al
@@ -186,14 +237,49 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
 
 ## Cosa manca / prossimi passi naturali
 
-- Oceania e LatAm (il piano originale del progetto include queste
-  regioni, non ancora integrate — nessun fetcher scritto per loro)
-- Allineamento nomi paese se qualcuno risultasse ancora grigio sulla
-  mappa (verificare con l'atlante 50m, i nomi dovrebbero già combaciare
-  ma non è stato testato con tutti i 27 paesi contemporaneamente)
+Direzione di fondo (brief di allineamento): Prezzario deve diventare un
+"osservatorio aperto dei prezzi" — quanto costa, da dove viene il dato,
+quanto è aggiornato, com'è rispetto al contesto, come sta cambiando.
+Rafforzare il principio fonte/data/limiti, non diluirlo con funzioni
+decorative. Escluso per ora: redesign totale, Oceania/LatAm, media UE
+ponderata, import massivo storico, estrapolazioni causali.
+
+- **Freshness a 3 stati** (aggiornato / in attesa del nuovo dato / non
+  aggiornato), source-aware e frequency-aware, estesa anche ai
+  carburanti. Prerequisiti già in piedi: `retrieved_at` sui prezzi e
+  `fetch_runs`. Manca la logica (oggi `commodityFreshness.ts` fa solo
+  1 soglia binaria sulle sole materie prime) e i metadati di frequenza
+  attesa per fonte
+- **Pagina pubblica "Stato dei dati"**: modello dati pronto
+  (`fetch_runs`), pagina da costruire (ultimo tentativo / ultimo
+  successo / ultimo dato / errore recente per fonte)
+- **Registro correzioni**: quando una fonte ripubblica un valore
+  DIVERSO per la stessa data, oggi l'`onConflictDoUpdate` lo sovrascrive
+  e la vecchia versione sparisce. Serve un upsert CONDIZIONALE (nuova
+  riga solo se il valore differisce dall'ultimo salvato) — richiede di
+  toccare il vincolo unique `(commodity_id, recorded_at)`, il tie-break
+  di `getLatest*` e il dedup nello storico: va progettato a parte, NON
+  con un insert puro (reintrodurrebbe il bug dei duplicati)
+- **Localizzazione nomi paese** in italiano (oggi "Germany", "Poland"
+  dal bollettino). Attenzione: `EuropeFuelMap` fa il join su
+  `geo.properties.name` (inglese), serve un `displayName` separato dal
+  nome-chiave
+- **Mappa — semantica cromatica** (brief punto 23): passare da rampa
+  monocroma min/max a scala divergente centrata sulla media UE
+  (`euAveragePetrol`, già passata come prop); spostare i box "più
+  caro/economico" FUORI dalla cartografia (riga `MIN | MEDIA UE | MAX`);
+  il colore non deve essere l'unico veicolo dell'informazione. È un
+  cambio di CALCOLO, non solo di stile
+- **API v1 / permalink / "Carta del prezzo" / widget / citazioni** —
+  visione a lungo termine del brief, tutto dipendente da metadati e
+  freshness stabili. Non prima. `/api/data` attuale è provvisorio
+- **MIMIT** (prezzi distributori italiani): dataset enorme, richiede un
+  modello di regione GERARCHICO (oggi `regions` è piatto) + retention +
+  tabelle dedicate. Progetto separato con la sua fase di design
 - Il grafico storico prezzi esiste già (`PriceHistoryChart`, finestre
   90gg materie prime / 30gg carburanti). Manca semmai una finestra più
   lunga ora che `price_history` accumula più mesi
-- Badge "non aggiornato" anche per i carburanti (oggi solo materie prime)
-- Media UE ponderata per popolazione invece di media semplice (richiede
-  dati di popolazione per paese, non ancora integrati)
+- Identità "Prezzario" come wordmark più marcato (brief punto 17) e
+  blocco "snapshot" di testa (indicatori assoluti) — da coordinare con
+  la sezione "Maggiori variazioni" già esistente per non avere 3
+  riquadri di sintesi sovrapposti
