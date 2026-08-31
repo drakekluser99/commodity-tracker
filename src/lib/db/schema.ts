@@ -1,6 +1,7 @@
 import {
   pgTable,
   serial,
+  integer,
   text,
   numeric,
   timestamp,
@@ -33,7 +34,10 @@ export const priceHistory = pgTable(
   "price_history",
   {
     id: serial("id").primaryKey(),
-    commodityId: serial("commodity_id")
+    // `integer` e non `serial`: è una chiave esterna, il valore lo fornisce
+    // sempre il codice (l'id della commodity). `serial` le darebbe una
+    // sequence e un DEFAULT nextval() inutili e potenzialmente fuorvianti.
+    commodityId: integer("commodity_id")
       .notNull()
       .references(() => commodities.id),
     // `numeric` invece di `float`: evita errori di arrotondamento sui prezzi
@@ -81,7 +85,8 @@ export const retailFuelPrices = pgTable(
   "retail_fuel_prices",
   {
     id: serial("id").primaryKey(),
-    regionId: serial("region_id")
+    // FK: `integer`, non `serial` (vedi price_history.commodityId).
+    regionId: integer("region_id")
       .notNull()
       .references(() => regions.id),
     fuelType: varchar("fuel_type", { length: 32 }).notNull(), // "petrol" | "diesel"
