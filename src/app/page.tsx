@@ -224,13 +224,13 @@ export default async function Home() {
                 Prezzario · Progetto open source
               </p>
               <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-                Materie prime e carburanti, in tempo quasi reale
+                Prezzi di materie prime e carburanti
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-relaxed text-system-ink-secondary">
                 Dati raccolti da fonti pubbliche: Alpha Vantage per le materie
                 prime globali, la Commissione Europea e l&apos;EIA per i
-                carburanti al consumo. Aggiornati automaticamente ogni
-                giorno.
+                carburanti al consumo. Aggiornati automaticamente alla cadenza
+                di ciascuna fonte, con fonte, data e limiti dichiarati.
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-2">

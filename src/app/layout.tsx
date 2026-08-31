@@ -16,11 +16,11 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://commodity-tracker-one-delta.vercel.app"),
   title: "Prezzario · Prezzi materie prime e carburanti",
   description:
-    "Tracciamento in tempo quasi reale di materie prime globali (petrolio, gas, metalli, agricole) e carburanti al consumo per regione. Dati pubblici, fonti verificate, nessuna garanzia di accuratezza.",
+    "Prezzi di materie prime globali (petrolio, gas, metalli, agricole) e carburanti al consumo per regione. Dati pubblici, con fonte, data e limiti dichiarati; nessuna garanzia di accuratezza.",
   openGraph: {
     title: "Prezzario",
     description:
-      "Prezzi materie prime e carburanti, in tempo quasi reale — dati pubblici e verificati.",
+      "Prezzi di materie prime e carburanti — dati pubblici, con fonte, data e limiti.",
     url: "https://commodity-tracker-one-delta.vercel.app",
     siteName: "Prezzario",
     locale: "it_IT",
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary",
     title: "Prezzario",
-    description: "Prezzi materie prime e carburanti, in tempo quasi reale.",
+    description: "Prezzi di materie prime e carburanti. Fonte, data e limiti inclusi.",
   },
 };
 
