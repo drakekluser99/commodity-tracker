@@ -6,6 +6,7 @@ import {
   numeric,
   timestamp,
   varchar,
+  boolean,
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
@@ -117,5 +118,38 @@ export const retailFuelPrices = pgTable(
     regionFuelRecordedUnique: uniqueIndex(
       "retail_fuel_region_fuel_recorded_at_unique"
     ).on(table.regionId, table.fuelType, table.recordedAt),
+  })
+);
+
+/**
+ * FETCH_RUNS
+ * Un record per ogni esecuzione di un cron di acquisizione: quando è
+ * partita, se è riuscita, quanti punti ha salvato, l'errore se c'è stato.
+ *
+ * Perché serve: oggi i fetcher fanno try/catch e loggano su console, ma
+ * non resta traccia strutturata. Senza questo non si può costruire una
+ * pagina "Stato dei dati" né una freshness che distingua "fonte rotta"
+ * da "fonte che non ha ancora pubblicato". È il posto dove intercettare
+ * anche i fallimenti silenziosi (Alpha Vantage risponde HTTP 200 con un
+ * rate limit al posto dei dati: `pointsSaved` a 0 quando ne attendevamo
+ * di più è il segnale).
+ */
+export const fetchRuns = pgTable(
+  "fetch_runs",
+  {
+    id: serial("id").primaryKey(),
+    source: varchar("source", { length: 64 }).notNull(), // "alpha_vantage" | "eu_weekly_oil_bulletin" | "eia_us"
+    job: varchar("job", { length: 64 }).notNull(), // es. "fetch-market-prices-3"
+    startedAt: timestamp("started_at").notNull().defaultNow(),
+    finishedAt: timestamp("finished_at"), // null = run ancora in corso o interrotta
+    ok: boolean("ok"), // null finché non finita
+    pointsSaved: integer("points_saved"),
+    errorText: text("error_text"),
+  },
+  (table) => ({
+    sourceStartedIdx: index("fetch_runs_source_started_idx").on(
+      table.source,
+      table.startedAt
+    ),
   })
 );
