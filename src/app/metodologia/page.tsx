@@ -100,7 +100,9 @@ export default function Metodologia() {
           <p className="text-sm leading-relaxed text-system-ink-secondary">
             Questo è un progetto open source: chiunque può ispezionare il
             codice, verificare come i dati vengono raccolti e processati,
-            o contribuire con miglioramenti.
+            o contribuire con miglioramenti. Il codice è rilasciato sotto
+            licenza MIT; i dati di prezzo restano soggetti ai termini delle
+            rispettive fonti.
           </p>
         </Section>
 

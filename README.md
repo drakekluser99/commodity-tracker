@@ -17,7 +17,7 @@ dichiarati esplicitamente.
 
 | Fonte | Dati | Aggiornamento |
 | --- | --- | --- |
-| [Alpha Vantage](https://www.alphavantage.co/documentation/#commodities) | Materie prime globali (petrolio, gas, metalli, agricole) | Giornaliero |
+| [Alpha Vantage](https://www.alphavantage.co/documentation/#commodities) | Materie prime globali (petrolio, gas, metalli, agricole) | Giornaliero per l'energia, mensile per metalli e agricole |
 | [Bollettino Petrolifero Settimanale](https://energy.ec.europa.eu/data-and-analysis/weekly-oil-bulletin_en) (Commissione Europea) | Carburanti al consumo, paesi UE | Ogni giovedì |
 | [EIA](https://www.eia.gov/opendata/) (U.S. Energy Information Administration) | Carburanti al consumo, USA | Ogni lunedì |
 
@@ -54,11 +54,17 @@ npm run db:migrate     # applica le migrazioni
 npm run db:studio      # Drizzle Studio
 ```
 
-## Licenza e disclaimer
+## Licenza
 
-Progetto open source · dati pubblici, **nessuna garanzia di accuratezza**.
-I prezzi sono medie nazionali o dati di mercato ritardati, non quotazioni in
-tempo reale né prezzi di punti vendita specifici. Vedi la
+Codice rilasciato sotto licenza [MIT](./LICENSE). I dati di prezzo provengono
+da fonti terze (Alpha Vantage, Commissione Europea, EIA), ciascuna con i
+propri termini d'uso: non sono coperti dalla licenza del codice.
+
+## Disclaimer
+
+Dati pubblici, **nessuna garanzia di accuratezza**. I prezzi sono medie
+nazionali o dati di mercato ritardati, non quotazioni in tempo reale né
+prezzi di punti vendita specifici. Vedi la
 [pagina Metodologia](https://commodity-tracker-one-delta.vercel.app/metodologia)
 per fonti, limiti e frequenza di aggiornamento.
 
