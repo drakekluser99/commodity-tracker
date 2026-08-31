@@ -34,15 +34,32 @@ export async function saveEuFuelPrices(
       continue;
     }
 
-    await db.insert(retailFuelPrices).values({
-      regionId,
-      fuelType: point.fuelType,
-      price: point.pricePerLiter.toString(),
-      currency: point.currency,
-      unit: "liter",
-      recordedAt: new Date(point.date),
-      source,
-    });
+    // Upsert sul vincolo unique (region_id, fuel_type, recorded_at):
+    // il bollettino settimanale può essere ripubblicato con valori
+    // rivisti per la stessa settimana — in quel caso aggiorniamo.
+    await db
+      .insert(retailFuelPrices)
+      .values({
+        regionId,
+        fuelType: point.fuelType,
+        price: point.pricePerLiter.toString(),
+        currency: point.currency,
+        unit: "liter",
+        recordedAt: new Date(point.date),
+        source,
+      })
+      .onConflictDoUpdate({
+        target: [
+          retailFuelPrices.regionId,
+          retailFuelPrices.fuelType,
+          retailFuelPrices.recordedAt,
+        ],
+        set: {
+          price: point.pricePerLiter.toString(),
+          currency: point.currency,
+          source,
+        },
+      });
 
     saved++;
   }

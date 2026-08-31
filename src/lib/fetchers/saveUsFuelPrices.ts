@@ -30,15 +30,32 @@ export async function saveUsFuelPrices(
 
   let saved = 0;
   for (const point of points) {
-    await db.insert(retailFuelPrices).values({
-      regionId,
-      fuelType: point.fuelType,
-      price: point.pricePerLiter.toString(),
-      currency: point.currency,
-      unit: "liter",
-      recordedAt: new Date(point.date),
-      source,
-    });
+    // Upsert sul vincolo unique (region_id, fuel_type, recorded_at):
+    // se l'EIA rivede un valore settimanale già salvato lo aggiorniamo
+    // invece di accumulare una riga in più.
+    await db
+      .insert(retailFuelPrices)
+      .values({
+        regionId,
+        fuelType: point.fuelType,
+        price: point.pricePerLiter.toString(),
+        currency: point.currency,
+        unit: "liter",
+        recordedAt: new Date(point.date),
+        source,
+      })
+      .onConflictDoUpdate({
+        target: [
+          retailFuelPrices.regionId,
+          retailFuelPrices.fuelType,
+          retailFuelPrices.recordedAt,
+        ],
+        set: {
+          price: point.pricePerLiter.toString(),
+          currency: point.currency,
+          source,
+        },
+      });
     saved++;
   }
 

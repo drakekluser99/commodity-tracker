@@ -36,12 +36,21 @@ export async function savePricePoints(
       })
       .returning();
 
-    await db.insert(priceHistory).values({
-      commodityId: commodity.id,
-      price: point.price.toString(), // `numeric` di Postgres si passa come stringa via Drizzle
-      recordedAt: new Date(point.date),
-      source,
-    });
+    // Upsert sul vincolo unique (commodity_id, recorded_at): se il cron
+    // rigira e la fonte ripropone la stessa data, aggiorniamo il prezzo
+    // (magari ricalcolato dalla fonte) invece di inserire un duplicato.
+    await db
+      .insert(priceHistory)
+      .values({
+        commodityId: commodity.id,
+        price: point.price.toString(), // `numeric` di Postgres si passa come stringa via Drizzle
+        recordedAt: new Date(point.date),
+        source,
+      })
+      .onConflictDoUpdate({
+        target: [priceHistory.commodityId, priceHistory.recordedAt],
+        set: { price: point.price.toString(), source },
+      });
 
     saved++;
   }

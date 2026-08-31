@@ -1,0 +1,2 @@
+CREATE UNIQUE INDEX "price_history_commodity_recorded_at_unique" ON "price_history" USING btree ("commodity_id","recorded_at");--> statement-breakpoint
+CREATE UNIQUE INDEX "retail_fuel_region_fuel_recorded_at_unique" ON "retail_fuel_prices" USING btree ("region_id","fuel_type","recorded_at");

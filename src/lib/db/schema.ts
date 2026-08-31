@@ -6,6 +6,7 @@ import {
   timestamp,
   varchar,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -47,6 +48,13 @@ export const priceHistory = pgTable(
       table.commodityId,
       table.recordedAt
     ),
+    // Vincolo di unicità: una sola rilevazione per (materia prima, data).
+    // Serve da bersaglio all'upsert in savePricePoints: se la fonte
+    // ricalcola/corregge un valore già salvato lo AGGIORNIAMO, invece di
+    // accumulare righe duplicate a ogni run del cron.
+    commodityRecordedUnique: uniqueIndex(
+      "price_history_commodity_recorded_at_unique"
+    ).on(table.commodityId, table.recordedAt),
   })
 );
 
@@ -88,5 +96,12 @@ export const retailFuelPrices = pgTable(
       table.regionId,
       table.recordedAt
     ),
+    // Stessa logica di price_history: una sola rilevazione per
+    // (regione, tipo carburante, data). Bersaglio dell'upsert nei
+    // fetcher EU/US. Il fuel_type entra nella chiave perché per la
+    // stessa regione e data salviamo sia benzina che diesel.
+    regionFuelRecordedUnique: uniqueIndex(
+      "retail_fuel_region_fuel_recorded_at_unique"
+    ).on(table.regionId, table.fuelType, table.recordedAt),
   })
 );
