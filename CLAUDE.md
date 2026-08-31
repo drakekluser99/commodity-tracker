@@ -23,10 +23,20 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
 
 - `src/lib/db/schema.ts` — 4 tabelle: `commodities`, `price_history`
   (materie prime globali), `regions`, `retail_fuel_prices` (carburanti
-  per regione)
+  per regione). `price_history` ha un `uniqueIndex` su
+  `(commodity_id, recorded_at)` e `retail_fuel_prices` uno su
+  `(region_id, fuel_type, recorded_at)`: sono il bersaglio dell'upsert
+  nei fetcher, evitano righe duplicate a ogni run del cron
 - `src/lib/db/queries.ts` — query di lettura (ultimo prezzo per ogni
-  commodity/regione)
-- `src/lib/fetchers/` — un fetcher per fonte dati:
+  commodity/regione). NON filtrano per data (vedi "Errori noti")
+- `src/lib/commodityFreshness.ts` — calcola l'età dell'ultimo prezzo di
+  una commodity e se va segnalata come non aggiornata (soglia per
+  cadenza: 14gg per l'energia giornaliera, 75gg per metalli/agricole
+  mensili). Alimenta il badge "non aggiornato" nella tabella materie prime
+- `src/lib/commodityDisplay.ts` — conversioni di SOLA visualizzazione
+  (es. cotone da cents/pound a cents/kg); il dato grezzo salvato non si
+  tocca mai
+- `src/lib/fetchers/` — un fetcher per fonte dati + gli helper di salvataggio:
   - `alphaVantage.ts` — API REST, materie prime globali, 10 simboli
     divisi in 5 batch da 2 (`COMMODITY_BATCH_1`…`_5`). Le chiamate
     dentro un batch sono SEQUENZIALI con pausa di 2s: le richieste
@@ -38,6 +48,9 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
     Europea (bollettino settimanale carburanti), parsing DIFENSIVO per
     nome colonna (non posizione), validato contro dati reali
   - `eiaUs.ts` — API REST EIA (governo USA), carburanti settimanali
+  - `savePricePoints.ts` / `saveEuFuelPrices.ts` / `saveUsFuelPrices.ts`
+    — persistenza. Usano `onConflictDoUpdate` sul vincolo unique: se la
+    fonte ripropone la stessa data aggiornano il prezzo, non duplicano
 - `src/app/api/cron/*/route.ts` — 7 route protette da `CRON_SECRET`
   (header `Authorization: Bearer`), schedulate in `vercel.json`:
   `fetch-market-prices-1`…`-5` (materie prime, ogni batch a un'ora
@@ -46,11 +59,19 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   `fetch-eu-fuel-prices` (giovedì), `fetch-us-fuel-prices` (lunedì).
   Il limite Hobby è 100 cron job/progetto, uno al giorno ciascuno
 - `src/app/page.tsx` — homepage: dashboard con mappa Europa, calcolatore
-  d'impatto, tabelle materie prime/carburanti
+  d'impatto, tabelle materie prime/carburanti. Nav header = "tab bar"
+  connessa (contenitore unico + `border-l` tra le voci). Footer con
+  divisori `border-l` tra le colonne (solo `lg`). Tabella materie prime:
+  badge "non aggiornato" nella colonna Data (da `commodityFreshness.ts`).
+  `LinkedinGlyph` è una SVG inline (lucide non ha icone brand)
 - `src/app/metodologia/page.tsx` — pagina trasparenza (fonti, limiti,
-  frequenza aggiornamento)
+  frequenza aggiornamento). Spiega anche il badge "non aggiornato"
 - `src/components/EuropeFuelMap.tsx` — mappa interattiva (react-simple-maps,
-  atlante 50m — NON usare 110m, omette paesi piccoli come Malta/Lussemburgo)
+  atlante 50m — NON usare 110m, omette paesi piccoli come Malta/Lussemburgo).
+  Inquadratura stretta sull'Europa con dati (`rotate: [-13,-50]`,
+  `scale: 900`, viewBox 800×490): riduce il grigio a est. Cipro e Malta
+  finiscono ai bordi sud-est. Due etichette fisse in alto a destra con
+  il paese più economico e quello più caro (benzina), calcolate dai dati
 - `src/components/FuelImpactCalculator.tsx` — calcolatore costo
   pieno/trasporti, EU vs USA
 - `src/components/MobileNav.tsx` — menu hamburger mobile
@@ -90,6 +111,10 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   Components" A RUNTIME (non lo cattura né `tsc` né `eslint`, solo
   visitando la pagina o con `npm run dev`). Se serve un'icona in un
   client component, definiscila lì dentro, non passarla come prop.
+- **`lucide-react` (1.34.0) non ha icone di brand**: niente `Linkedin`,
+  `Github`, `Twitter` ecc. (`typeof Linkedin === "undefined"`). Per un
+  logo di brand serve una SVG inline — vedi `LinkedinGlyph` in
+  `page.tsx` (`fill="currentColor"` per ereditare il colore del link)
 - `drizzle-kit` non legge `.env.local` di default (è una convenzione
   solo di Next.js) — `drizzle.config.ts` lo carica esplicitamente con
   `dotenv`
@@ -109,7 +134,9 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   sotto-giornaliere (`*/30 * * * *`, `0 * * * *`) fanno FALLIRE il deploy
 - `getLatestCommodityPrices`/`getLatestFuelPrices` non filtrano per data:
   mostrano l'ultimo valore salvato "per sempre", anche se vecchio di
-  mesi. Se una commodity smette di aggiornarsi il sito non lo segnala
+  mesi. Mitigazione PARZIALE: le materie prime hanno il badge "non
+  aggiornato" (`commodityFreshness.ts`); i carburanti no. Se cambi la
+  cadenza di una fonte, aggiorna anche le soglie in `commodityFreshness.ts`
 
 ## Workflow con l'utente
 
@@ -132,8 +159,9 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
 - Allineamento nomi paese se qualcuno risultasse ancora grigio sulla
   mappa (verificare con l'atlante 50m, i nomi dovrebbero già combaciare
   ma non è stato testato con tutti i 27 paesi contemporaneamente)
-- Possibile grafico storico prezzi nel tempo (oggi mostriamo solo
-  l'ultimo valore, `price_history`/`retail_fuel_prices` accumulano già
-  storico utilizzabile)
+- Il grafico storico prezzi esiste già (`PriceHistoryChart`, finestre
+  90gg materie prime / 30gg carburanti). Manca semmai una finestra più
+  lunga ora che `price_history` accumula più mesi
+- Badge "non aggiornato" anche per i carburanti (oggi solo materie prime)
 - Media UE ponderata per popolazione invece di media semplice (richiede
   dati di popolazione per paese, non ancora integrati)
