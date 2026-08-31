@@ -36,6 +36,13 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
 - `src/lib/commodityDisplay.ts` — conversioni di SOLA visualizzazione
   (es. cotone da cents/pound a cents/kg); il dato grezzo salvato non si
   tocca mai
+- `src/lib/priceHistory.ts` — trasforma le righe grezze di storico in
+  serie pronte per il grafico: `groupCommodityHistory` (una serie per
+  simbolo), `groupFuelHistory` (continente × carburante, media UE sui
+  paesi presenti in quella data). `priceMovers` calcola la variazione %
+  tra primo e ultimo punto di ogni serie (salta serie con <2 punti o
+  primo valore 0) e alimenta la sezione "Maggiori variazioni" della
+  homepage. Logica separata da React apposta per testarla con Node
 - `src/lib/fetchers/` — un fetcher per fonte dati + gli helper di salvataggio:
   - `alphaVantage.ts` — API REST, materie prime globali, 10 simboli
     divisi in 5 batch da 2 (`COMMODITY_BATCH_1`…`_5`). Le chiamate
@@ -58,14 +65,31 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   oraria ±59min, quindi vanno distanziati di ore non di minuti),
   `fetch-eu-fuel-prices` (giovedì), `fetch-us-fuel-prices` (lunedì).
   Il limite Hobby è 100 cron job/progetto, uno al giorno ciascuno
-- `src/app/page.tsx` — homepage: dashboard con mappa Europa, calcolatore
-  d'impatto, tabelle materie prime/carburanti. Nav header = "tab bar"
-  connessa (contenitore unico + `border-l` tra le voci). Footer con
-  divisori `border-l` tra le colonne (solo `lg`). Tabella materie prime:
+- `src/app/api/data/route.ts` — endpoint pubblico `GET /api/data`: JSON
+  con gli ultimi prezzi (stessi dati della homepage, da `queries.ts`).
+  CORS aperto (`Access-Control-Allow-Origin: *`) + handler `OPTIONS`
+  esplicito per il preflight (Next ne genera uno automatico ma senza gli
+  header CORS). Valori GREZZI, nessuna conversione di visualizzazione
+  (cotone in cents/pound). `force-dynamic`, nessuna cache
+- `src/app/page.tsx` — homepage: dashboard con sezione "Maggiori
+  variazioni" (in cima, senza numero d'indice: top 5 scostamenti da
+  `priceMovers`, materie prime 90gg + carburanti 30gg con la finestra
+  dichiarata per riga; ruggine = in salita, verde = in discesa), mappa
+  Europa, calcolatore d'impatto, tabelle materie prime/carburanti. Ogni
+  tabella ha i pulsanti "Scarica CSV/JSON" (`DownloadDataButtons`). Nav
+  header = "tab bar" connessa (contenitore unico + `border-l` tra le
+  voci). Footer con divisori `border-l` tra le colonne (solo `lg`);
+  colonna "Progetto" con Metodologia + Glossario. Tabella materie prime:
   badge "non aggiornato" nella colonna Data (da `commodityFreshness.ts`).
   `LinkedinGlyph` è una SVG inline (lucide non ha icone brand)
 - `src/app/metodologia/page.tsx` — pagina trasparenza (fonti, limiti,
-  frequenza aggiornamento). Spiega anche il badge "non aggiornato"
+  frequenza aggiornamento). Spiega anche il badge "non aggiornato" e
+  documenta l'API pubblica `/api/data` (sezione 05, con esempio di
+  risposta)
+- `src/app/glossario/page.tsx` — pagina FAQ/glossario (WTI vs Brent,
+  Weekly Oil Bulletin, EIA, cadenza giornaliera vs mensile, badge "non
+  aggiornato" → rimanda a metodologia). Stesso pattern di
+  `metodologia/page.tsx` (helper `Section`, header "torna alla dashboard")
 - `src/components/EuropeFuelMap.tsx` — mappa interattiva (react-simple-maps,
   atlante 50m — NON usare 110m, omette paesi piccoli come Malta/Lussemburgo).
   Inquadratura stretta sull'Europa con dati (`rotate: [-13,-50]`,
@@ -74,7 +98,15 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   il paese più economico e quello più caro (benzina), calcolate dai dati
 - `src/components/FuelImpactCalculator.tsx` — calcolatore costo
   pieno/trasporti, EU vs USA
-- `src/components/MobileNav.tsx` — menu hamburger mobile
+- `src/components/MobileNav.tsx` — menu hamburger mobile. Prop `items`
+  (ancore alla dashboard, con icona) e `pageLinks` (link a pagine —
+  Metodologia, Glossario — resi come `next/link`, senza icona). Stesso
+  trattamento "tab bar" connessa del menu desktop, in verticale
+- `src/components/DownloadDataButtons.tsx` — pulsanti "Scarica CSV/JSON"
+  per una tabella. Costruisce il file nel browser (Blob + object URL),
+  nessun endpoint dedicato. CSV con escaping RFC 4180 (campo quotato solo
+  se contiene `,`/`"`/a-capo, virgolette raddoppiate). Usato dalla
+  tabella materie prime in `page.tsx` e da `FuelPriceTable`
 
 ## Convenzioni di stile del codice
 
