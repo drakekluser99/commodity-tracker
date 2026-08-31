@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { DownloadDataButtons } from "./DownloadDataButtons";
+import { formatFuelPrice, currencySymbol } from "@/lib/format";
 
 // Colonne dell'export (CSV/JSON). Ordine = ordine nel file.
 const FUEL_EXPORT_COLUMNS = [
@@ -201,9 +202,14 @@ export function FuelPriceTable({
                     <td className="px-4 py-3 text-system-ink-secondary capitalize">
                       {f.fuelType === "petrol" ? "Benzina" : "Diesel"}
                     </td>
-                    <td className="px-4 py-3 text-right font-mono tabular-nums">
-                      {parseFloat(f.price).toFixed(3)}{" "}
-                      <span className="text-xs text-system-ink-muted">{f.currency}</span>
+                    <td
+                      className="px-4 py-3 text-right font-mono tabular-nums"
+                      title={`Valore grezzo della fonte: ${f.price} ${f.currency}/litro`}
+                    >
+                      {formatFuelPrice(parseFloat(f.price))}{" "}
+                      <span className="text-xs text-system-ink-muted">
+                        {currencySymbol(f.currency)}
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-right text-system-ink-muted">
                       {f.recordedAtFormatted}

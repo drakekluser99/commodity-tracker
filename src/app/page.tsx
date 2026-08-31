@@ -6,6 +6,11 @@ import {
 } from "@/lib/db/queries";
 import { groupCommodityHistory, groupFuelHistory, priceMovers } from "@/lib/priceHistory";
 import { displayCommodityPrice } from "@/lib/commodityDisplay";
+import {
+  formatCommodityPrice,
+  formatPercent,
+  shortUnit,
+} from "@/lib/format";
 import { commodityFreshness } from "@/lib/commodityFreshness";
 import EuropeFuelMap from "@/components/EuropeFuelMap";
 import FuelImpactCalculator from "@/components/FuelImpactCalculator";
@@ -328,7 +333,8 @@ export default async function Home() {
                           {m.label}
                         </div>
                         <div className="mt-0.5 font-mono text-xs tabular-nums text-system-ink-muted">
-                          {m.first.toFixed(2)} → {m.last.toFixed(2)} {m.unit}
+                          {formatCommodityPrice(m.first)} →{" "}
+                          {formatCommodityPrice(m.last)} {shortUnit(m.unit)}
                         </div>
                       </div>
                       <div
@@ -343,8 +349,7 @@ export default async function Home() {
                         ) : (
                           <ArrowDownRight size={16} />
                         )}
-                        {up ? "+" : ""}
-                        {m.changePct.toFixed(1)}%
+                        {formatPercent(m.changePct)}
                       </div>
                     </div>
                     <div className="mt-2 font-mono text-[11px] uppercase tracking-wider text-system-ink-muted">
@@ -436,8 +441,14 @@ export default async function Home() {
                       <td className="px-4 py-3 text-system-ink-secondary">
                         {CATEGORY_LABELS[c.category] ?? c.category}
                       </td>
-                      <td className="px-4 py-3 text-right font-mono tabular-nums">
-                        {c.displayPrice} <span className="text-xs text-system-ink-muted">{c.displayUnit}</span>
+                      <td
+                        className="px-4 py-3 text-right font-mono tabular-nums"
+                        title={`Valore grezzo della fonte: ${c.displayPrice} ${c.displayUnit}`}
+                      >
+                        {formatCommodityPrice(parseFloat(c.displayPrice))}{" "}
+                        <span className="text-xs text-system-ink-muted">
+                          {shortUnit(c.displayUnit)}
+                        </span>
                       </td>
                       <td className="px-4 py-3 text-right text-system-ink-muted">
                         <span className="inline-flex items-center gap-2">

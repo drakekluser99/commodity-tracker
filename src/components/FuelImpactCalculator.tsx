@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { Car, Truck } from "lucide-react";
+import { formatFuelPrice, currencySymbol } from "@/lib/format";
 
 export interface RegionFuelAverage {
   petrol: number | null;
@@ -31,8 +32,8 @@ function formatMoney(value: number, currency: string): string {
 }
 
 function formatPricePerLiter(value: number, currency: string): string {
-  const symbol = currency === "EUR" ? "€" : "$";
-  return `${value.toFixed(3)} ${symbol}/L`;
+  // Stesso layer di formattazione delle tabelle (separatori it-IT).
+  return `${formatFuelPrice(value)} ${currencySymbol(currency)}/L`;
 }
 
 function useNumericField(defaultValue: number) {
