@@ -221,7 +221,7 @@ export default async function Home() {
   return (
     <div className="min-h-screen bg-system-bg text-system-ink">
       <header className="border-b border-system-border bg-white">
-        <div className="mx-auto max-w-screen-2xl px-6 py-8">
+        <div className="mx-auto max-w-7xl px-6 py-8">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-system-accent">
@@ -299,7 +299,7 @@ export default async function Home() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-screen-2xl px-6 py-10">
+      <main className="mx-auto max-w-7xl px-6 py-10">
         {/* "Maggiori variazioni": riepilogo in cima, senza numero di
             sezione — è una sintesi dei dati che seguono, non una quinta
             sezione dell'indice 01–04. */}
@@ -530,10 +530,8 @@ export default async function Home() {
         </section>
       </main>
 
-      <footer className="relative mt-8 rounded-t-4xl border-t border-system-border bg-white">
-        <div className="absolute left-1/2 right-1/2 top-0 h-px w-1/3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-r from-transparent via-system-accent/30 to-transparent blur-[1px]" />
-
-        <div className="mx-auto max-w-screen-2xl px-6 py-12">
+      <footer className="mt-8 border-t border-system-border bg-white">
+        <div className="mx-auto max-w-7xl px-6 py-12">
           {/* Colonne del footer separate da divisori verticali (border-l col
               colore bordo del design system) invece che dal solo spazio
               vuoto. Attivi solo da `lg` in su, dove la griglia è a 4
