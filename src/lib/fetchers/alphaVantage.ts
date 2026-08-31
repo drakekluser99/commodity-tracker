@@ -31,6 +31,14 @@ interface AlphaVantageCommodityResponse {
   interval: string;
   unit: string;
   data: Array<{ date: string; value: string }>;
+  // Campi che Alpha Vantage restituisce AL POSTO di `data` nei casi
+  // anomali, tutti con HTTP 200: rate limit superato (`Information` sul
+  // piano free attuale, `Note` sul vecchio), oppure chiave/simbolo
+  // sbagliati (`Error Message`). Li dichiariamo opzionali per poterli
+  // loggare esplicitamente invece di ritrovarci `data` undefined.
+  Information?: string;
+  Note?: string;
+  "Error Message"?: string;
 }
 
 export interface NormalizedPricePoint {
@@ -62,8 +70,21 @@ async function fetchOne(
 
   const json = (await res.json()) as AlphaVantageCommodityResponse;
 
-  // La risposta può anche contenere { "Note": "..." } quando si supera
-  // il rate limit, invece della forma attesa: lo intercettiamo qui.
+  // Casi anomali con HTTP 200 in cui manca `data`: rate limit superato
+  // (`Information`/`Note`) o chiave/simbolo non validi (`Error Message`).
+  // Prima li ingoiavamo con un `return null` muto e sparivano senza
+  // traccia: ora li rendiamo visibili nei log di Vercel.
+  const anomalyMessage =
+    json.Information ?? json.Note ?? json["Error Message"];
+  if (anomalyMessage) {
+    console.error(
+      `Alpha Vantage: risposta anomala per ${commodity.symbol} — ${anomalyMessage}`
+    );
+    return null;
+  }
+
+  // Alpha Vantage a volte restituisce "value": "." quando il dato per
+  // quel giorno non è ancora disponibile: in quel caso scartiamo il punto.
   const latest = json.data?.[0];
   if (!latest || latest.value === ".") {
     return null;
