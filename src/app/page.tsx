@@ -23,7 +23,10 @@ const GITHUB_URL = "https://github.com/drakekluser99/commodity-tracker";
 const CATEGORY_LABELS: Record<string, string> = {
   energy: "Energia",
   metal: "Metalli",
-  agricultural: "Agricole",
+  // "Agricoltura" (sostantivo) e non "Agricole": la label appare da sola
+  // nella colonna Categoria ("Energia", "Metalli", ...), un aggettivo
+  // plurale senza sostantivo suonerebbe storto.
+  agricultural: "Agricoltura",
 };
 
 const CONTINENT_LABELS: Record<string, string> = {
