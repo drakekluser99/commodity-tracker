@@ -117,8 +117,12 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
 - `src/app/page.tsx` — homepage: dashboard con sezione "Maggiori
   variazioni" (in cima, senza numero d'indice: top 5 scostamenti da
   `priceMovers`, materie prime 90gg + carburanti 30gg con la finestra
-  dichiarata per riga; ruggine = in salita, verde = in discesa), mappa
-  Europa, calcolatore d'impatto, tabelle materie prime/carburanti. Ogni
+  dichiarata per riga; ruggine = in salita, verde = in discesa) — copre
+  nella sostanza il punto 15 del brief ("cosa è cambiato"), ma è una
+  classifica dei 5 maggiori scostamenti assoluti tra TUTTE le serie, non
+  una frase narrativa per singola voce: non garantisce che un indicatore
+  specifico (es. Brent) compaia se non è tra i 5 (verificato 1 set 2026).
+  Poi mappa Europa, calcolatore d'impatto, tabelle materie prime/carburanti. Ogni
   tabella ha i pulsanti "Scarica CSV/JSON" (`DownloadDataButtons`). Nav
   header = "tab bar" connessa (contenitore unico + `border-l` tra le
   voci). Contenuto a `max-w-7xl` (1280px). Footer piatto (bordo
@@ -241,6 +245,12 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
 - Font numeri: sempre `font-mono tabular-nums` per allineamento colonne
 - Ogni sezione dati ha una nota "Fonte: ..." sotto (componente
   `SourceNote`) — non rimuoverle, è il principio cardine del progetto
+- `SystemCard` (`src/components/SystemCard.tsx`) è deliberatamente
+  riservato a contenuti "speciali" (oggi: solo `SourceItem` in
+  `metodologia/page.tsx`, la scheda di ogni fonte dati) — verificato
+  1 set 2026, un solo punto d'uso in tutto il codice. Non usarlo per
+  card generiche di layout: se si diffonde perde il segnale "questo è
+  un elemento particolare", che è il motivo per cui esiste
 
 ## Errori noti e già risolti (non ripeterli)
 
@@ -357,6 +367,19 @@ ponderata, import massivo storico, estrapolazioni causali.
   dal bollettino). Attenzione: `EuropeFuelMap` fa il join su
   `geo.properties.name` (inglese), serve un `displayName` separato dal
   nome-chiave
+- **Calcolatore d'impatto — manca la dimensione temporale/comparativa**
+  (brief punto 14, verificato 1 set 2026): `FuelImpactCalculator.tsx`
+  mostra solo prezzi ATTUALI (benzina/diesel, costo pieno auto, costo
+  carburante/100km camion) per EU vs USA. Nessun confronto "vs mese
+  scorso", nessuna deviazione dalla media (quella esiste solo nel
+  tooltip della mappa, `EuropeFuelMap.tsx`, non nel calcolatore)
+- **Gerarchia fonti non visibile** (brief punto 12, verificato
+  1 set 2026): `SourceNote` tratta Alpha Vantage (intermediario
+  commerciale) e Commissione Europea/EIA (enti istituzionali primari)
+  con lo stesso identico stile in tutti e 4 i punti d'uso in `page.tsx`.
+  Stesso in `metodologia/page.tsx`: le 3 fonti sono nello stesso
+  `SourceItem`, nessun raggruppamento/badge — solo un accenno nella
+  prosa delle descrizioni, non una gerarchia strutturata
 - **API v1 / permalink / "Carta del prezzo" / widget / citazioni** —
   visione a lungo termine del brief, tutto dipendente da metadati e
   freshness stabili. Non prima. `/api/data` attuale è provvisorio
