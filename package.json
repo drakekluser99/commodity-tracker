@@ -2,6 +2,13 @@
   "name": "commodity-tracker",
   "version": "0.1.0",
   "private": true,
+  "description": "Osservatorio aperto dei prezzi di materie prime e carburanti in Europa e USA — ogni dato con fonte, data e limiti dichiarati.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/drakekluser99/commodity-tracker.git"
+  },
+  "homepage": "https://commodity-tracker-one-delta.vercel.app",
+  "license": "MIT",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

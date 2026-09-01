@@ -1,0 +1,52 @@
+name: Segnala un dato errato
+description: Un prezzo o un valore mostrato sul sito non corrisponde alla fonte ufficiale
+title: "[Dato errato] "
+labels: ["dato-errato"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Grazie per la segnalazione. Più informazioni fornisci, più
+        velocemente possiamo verificare e correggere.
+
+  - type: input
+    id: cosa
+    attributes:
+      label: Quale dato è coinvolto?
+      description: Es. "Prezzo diesel Italia", "Rame (Copper)", "Benzina USA"
+      placeholder: "Prezzo diesel Italia"
+    validations:
+      required: true
+
+  - type: input
+    id: valore-sito
+    attributes:
+      label: Cosa mostra il sito attualmente?
+      placeholder: "Es. 1,850 €/L, aggiornato al 23/08/2026"
+    validations:
+      required: true
+
+  - type: input
+    id: valore-corretto
+    attributes:
+      label: Qual è il valore corretto secondo la fonte ufficiale?
+      placeholder: "Es. 1,870 €/L al 23/08/2026"
+    validations:
+      required: true
+
+  - type: input
+    id: link-fonte
+    attributes:
+      label: Link alla fonte primaria che confermi il valore corretto
+      description: Es. link al bollettino della Commissione Europea, alla pagina EIA, o alla fonte Alpha Vantage
+      placeholder: "https://..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: note
+    attributes:
+      label: Altre note (opzionale)
+      description: Qualunque altro dettaglio utile — es. se il problema riguarda più date, più regioni, o sembra un problema sistematico
+    validations:
+      required: false
