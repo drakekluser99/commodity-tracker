@@ -24,7 +24,7 @@ export async function saveEuFuelPrices(
         countryCode: null, // potremmo mapparlo in futuro da un dizionario nome->ISO
         continent: "europe",
       })
-      .onConflictDoNothing() // se la regione esiste già, non serve aggiornarla (il nome non cambia)
+      .onConflictDoNothing({ target: regions.name }) // se la regione esiste già, non serve aggiornarla (il nome non cambia)
       .returning();
 
     // Se onConflictDoNothing non ha inserito nulla (riga già esistente),

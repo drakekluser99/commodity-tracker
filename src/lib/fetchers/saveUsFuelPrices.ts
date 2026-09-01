@@ -15,7 +15,7 @@ export async function saveUsFuelPrices(
       countryCode: "US",
       continent: "north_america",
     })
-    .onConflictDoNothing()
+    .onConflictDoNothing({ target: regions.name })
     .returning();
 
   const regionId =

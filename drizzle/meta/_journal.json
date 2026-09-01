@@ -36,6 +36,13 @@
       "when": 1788201737753,
       "tag": "0004_left_husk",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788259589327,
+      "tag": "0005_natural_magneto",
+      "breakpoints": true
     }
   ]
 }

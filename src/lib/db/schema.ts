@@ -78,7 +78,7 @@ export const priceHistory = pgTable(
  */
 export const regions = pgTable("regions", {
   id: serial("id").primaryKey(),
-  name: text("name").notNull(), // es. "Germany", "United States"
+  name: text("name").notNull().unique(), // es. "Germany", "United States"
   countryCode: varchar("country_code", { length: 2 }), // ISO 3166-1 alpha-2, nullable per aggregati
   continent: varchar("continent", { length: 32 }).notNull(), // "europe" | "north_america" | "oceania" | "latam"
 });
