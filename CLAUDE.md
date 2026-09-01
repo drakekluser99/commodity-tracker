@@ -127,10 +127,36 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   Metodologia + Glossario. Tabella materie prime: badge a 3 stati nella
   colonna Data (da `src/lib/freshness/`) — nessun badge se `aggiornato`,
   `system-accent-wait` (ambra/ocra) se `in_attesa`, `system-accent-down`
-  (ruggine, invariato) se `non_aggiornato`. `StatusLabel`
-  ("ULTIMO DATO · <data>") ha un pallino STATICO — niente animazione, i
-  dati non sono uno stream. `LinkedinGlyph` è una SVG inline (lucide non
-  ha icone brand)
+  (ruggine, invariato) se `non_aggiornato`. `LinkedinGlyph` è una SVG
+  inline (lucide non ha icone brand).
+
+  **Header (1 set 2026, brief punti 17+25)**: "Prezzario" è ora il
+  wordmark visivo dominante — icona `ProvenanceStamp` 36px + testo
+  `text-4xl sm:text-5xl font-bold text-system-ink`, con la tagline
+  "Progetto open source" sotto (`ml-[46px]`, valore tarato a video per
+  cadere sotto la "P" del wordmark — non deducibile a mente da
+  icona+gap, va riverificato a video se cambiano dimensioni/font).
+  L'eyebrow piccolo che prima portava "Prezzario · Progetto open source"
+  è sparito, assorbito nel wordmark (tenerlo insieme al wordmark grande
+  avrebbe duplicato il nome due volte). L'h1 esistente ("Prezzi di
+  materie prime e carburanti") resta l'elemento semantico h1 — per
+  SEO/accessibilità: è il testo che descrive il CONTENUTO della pagina,
+  il nome del prodotto da solo non porta segnale tematico — solo
+  ristilizzato a sottotitolo (`text-lg sm:text-xl font-medium`). Sotto,
+  la fascia sintetica a 4 valori (array `headerStats`, variabile locale
+  in `Home()`) sostituisce il vecchio `StatusLabel` a valore singolo:
+  Brent (da `commodityRows`, riga con `symbol === "BRENT"`), benzina e
+  diesel media UE (`europeAverage.petrol`/`.diesel` — già calcolate per
+  `EuropeFuelMap`/`FuelImpactCalculator`, nessuna nuova query), ultimo
+  dato (`lastUpdated`, invariato). `StatusLabel` (pallino STATICO —
+  niente animazione, i dati non sono uno stream) viene riusato 4 volte
+  in serie invece di un componente nuovo, con lo stesso pattern di
+  divisori `border-l` già visto nel footer: attivo solo da `lg` in su,
+  sotto è `grid grid-cols-2` (un `border-l` cadrebbe a metà riga quando
+  le tile vanno a capo — stesso motivo già documentato per il footer).
+  Fallback `"n/d"` per singola tile se un valore manca (fonte non ancora
+  pubblicata), mai l'omissione della tile: la griglia resta stabile a 4
+  colonne
 - `src/app/metodologia/page.tsx` — pagina trasparenza (fonti, limiti,
   frequenza aggiornamento, licenza MIT). Spiega anche il badge "non
   aggiornato" e documenta l'API pubblica `/api/data` (sezione 05, con
@@ -146,10 +172,9 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   atlante 50m — NON usare 110m, omette paesi piccoli come Malta/Lussemburgo).
   Inquadratura stretta sull'Europa con dati (`rotate: [-13,-50]`,
   `scale: 900`, viewBox 800×490): riduce il grigio a est. Cipro e Malta
-  finiscono ai bordi sud-est. **Modifica in corso, non ancora committata
-  (1 set 2026)** — in attesa di revisione visiva locale prima del commit:
-  scala colore divergente centrata sulla media UE (`euAveragePetrol`),
-  non più rampa monocroma min/max — scarto firmato `(prezzo - media) /
+  finiscono ai bordi sud-est. Scala colore divergente centrata sulla
+  media UE (`euAveragePetrol`, 1 set 2026), non più rampa monocroma
+  min/max — scarto firmato `(prezzo - media) /
   (max - min)`, clampato con fattore `*2`, verde (`system-accent`) sotto
   media / ruggine (`system-accent-down`) sopra, centro neutro
   `system-border` (NON `system-panel`, troppo simile al fill "nessun
@@ -332,10 +357,6 @@ ponderata, import massivo storico, estrapolazioni causali.
   dal bollettino). Attenzione: `EuropeFuelMap` fa il join su
   `geo.properties.name` (inglese), serve un `displayName` separato dal
   nome-chiave
-- **Mappa — semantica cromatica** (brief punto 23): **FATTO nel working
-  tree, non ancora committato (1 set 2026)** — vedi la voce
-  `EuropeFuelMap.tsx` in "Architettura". In attesa di revisione visiva
-  locale prima del commit/push
 - **API v1 / permalink / "Carta del prezzo" / widget / citazioni** —
   visione a lungo termine del brief, tutto dipendente da metadati e
   freshness stabili. Non prima. `/api/data` attuale è provvisorio
@@ -345,7 +366,8 @@ ponderata, import massivo storico, estrapolazioni causali.
 - Il grafico storico prezzi esiste già (`PriceHistoryChart`, finestre
   90gg materie prime / 30gg carburanti). Manca semmai una finestra più
   lunga ora che `price_history` accumula più mesi
-- Identità "Prezzario" come wordmark più marcato (brief punto 17) e
-  blocco "snapshot" di testa (indicatori assoluti) — da coordinare con
-  la sezione "Maggiori variazioni" già esistente per non avere 3
-  riquadri di sintesi sovrapposti
+- **Prossimo checkpoint (giovedì 3 set 2026)**: verificare in `fetch_runs`
+  il primo run automatico del cron `fetch-eu-fuel-prices` dopo le
+  modifiche di oggi (wordmark + fascia sintetica, commit `270b23c` e
+  `f266eb4`) — controllare che `ok: true` e che i valori di benzina/
+  diesel UE nella fascia sintetica si aggiornino di conseguenza
