@@ -8,8 +8,10 @@ import { groupCommodityHistory, groupFuelHistory, priceMovers } from "@/lib/pric
 import { displayCommodityPrice } from "@/lib/commodityDisplay";
 import {
   formatCommodityPrice,
+  formatFuelPrice,
   formatPercent,
   shortUnit,
+  currencySymbol,
 } from "@/lib/format";
 import { computeFreshness, getFreshnessConfig } from "@/lib/freshness/compute";
 import EuropeFuelMap from "@/components/EuropeFuelMap";
@@ -224,17 +226,62 @@ export default async function Home() {
       ? new Date(Math.max(...allTimestamps.map((d) => d.getTime())))
       : null;
 
+  // Fascia sintetica header (punto 25 del brief): valori derivati da dati
+  // già recuperati sopra, nessuna nuova query. "n/d" quando la fonte non
+  // ha ancora pubblicato nulla (es. subito dopo il primo deploy).
+  const brent = commodityRows.find((c) => c.symbol === "BRENT") ?? null;
+  const headerStats = [
+    {
+      key: "brent",
+      label: "BRENT",
+      value: brent
+        ? `${formatCommodityPrice(parseFloat(brent.displayPrice))} ${shortUnit(brent.displayUnit)}`
+        : "n/d",
+    },
+    {
+      key: "benzina",
+      label: "BENZINA UE",
+      value:
+        europeAverage.petrol !== null
+          ? `${formatFuelPrice(europeAverage.petrol)} ${currencySymbol(europeAverage.currency)}/L`
+          : "n/d",
+    },
+    {
+      key: "diesel",
+      label: "DIESEL UE",
+      value:
+        europeAverage.diesel !== null
+          ? `${formatFuelPrice(europeAverage.diesel)} ${currencySymbol(europeAverage.currency)}/L`
+          : "n/d",
+    },
+    {
+      key: "ultimo-dato",
+      label: "ULTIMO DATO",
+      value: lastUpdated ? formatDateTime(lastUpdated) : "n/d",
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-system-bg text-system-ink">
       <header className="border-b border-system-border bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-8">
+        <div className="mx-auto max-w-7xl px-6 py-10">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-system-accent">
-                <ProvenanceStamp size={28} className="shrink-0 text-system-accent" />
-                Prezzario · Progetto open source
+              {/* Wordmark (punto 17 del brief): "Prezzario" come elemento
+                  visivo dominante. Resta un <p>, non un heading — l'h1
+                  vero è la riga sotto, che descrive il CONTENUTO della
+                  pagina (rilevante per SEO/accessibilità); il nome del
+                  prodotto da solo non porta segnale tematico. */}
+              <div className="flex items-center gap-2.5">
+                <ProvenanceStamp size={36} className="shrink-0 text-system-accent" />
+                <p className="text-4xl font-bold tracking-tight text-system-ink sm:text-5xl">
+                  Prezzario
+                </p>
+              </div>
+              <p className="mt-1 ml-[46px] text-xs font-semibold uppercase tracking-[0.14em] text-system-accent">
+                Progetto open source
               </p>
-              <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+              <h1 className="mt-4 text-lg font-medium text-system-ink sm:text-xl">
                 Prezzi di materie prime e carburanti
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-relaxed text-system-ink-secondary">
@@ -266,18 +313,32 @@ export default async function Home() {
           </div>
 
           {lastUpdated && (
-            // Ex "Ultimo aggiornamento: ...": un'etichetta system-style con
-            // pallino di stato statico (i dati non sono uno stream) e la
-            // data dell'ultimo valore salvato, formattata in italiano.
+            // Fascia sintetica (punto 25 del brief): 4 indicatori assoluti
+            // di apertura — nessun delta/trend qui, quelli vivono già in
+            // "Maggiori variazioni" più sotto. Riusa StatusLabel in serie
+            // invece di un componente nuovo; stesso pattern di divisori
+            // border-l già usato per le colonne del footer, attivo solo da
+            // `lg` in su (sotto, un border-l cadrebbe a metà di righe che
+            // vanno a capo — stesso motivo già documentato lì).
             <div className="mt-4">
-              <StatusLabel
-                label="ULTIMO DATO"
-                value={formatDateTime(lastUpdated)}
-              />
+              <div className="grid grid-cols-2 gap-x-6 gap-y-3 lg:flex lg:items-center lg:gap-0">
+                {headerStats.map(({ key, label, value }, i) => (
+                  <div
+                    key={key}
+                    className={
+                      i === 0
+                        ? "lg:pr-6"
+                        : "lg:border-l lg:border-system-border-subtle lg:px-6"
+                    }
+                  >
+                    <StatusLabel label={label} value={value} />
+                  </div>
+                ))}
+              </div>
               {/* Contesto sulla cadenza: non tutto si aggiorna alla stessa
                   velocità, e dirlo qui in alto evita che l'utente lo scopra
                   solo scorrendo fino alle note "Fonte:". */}
-              <p className="mt-1 text-xs text-system-ink-muted">
+              <p className="mt-2 text-xs text-system-ink-muted">
                 Materie prime: ogni giorno · Carburanti: settimanale
               </p>
             </div>
