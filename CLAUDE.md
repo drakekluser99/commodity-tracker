@@ -33,16 +33,28 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   `retail_fuel_prices` hanno sia `recorded_at` (data DEL DATO) sia
   `retrieved_at` (quando il fetcher l'ha acquisito, nullable): due cose
   diverse, servono per distinguere "fonte ferma" da "fonte che non ha
-  ancora pubblicato". Migrazioni applicate al DB Neon fino alla `0004`
-  (31 ago 2026): `retrieved_at` è `NULL` per le righe salvate prima di
-  allora e si popola dal primo run successivo di ogni cron; `fetch_runs`
-  parte vuota e si riempie allo stesso modo
+  ancora pubblicato". Migrazioni applicate al DB Neon fino alla `0005`
+  (1 set 2026): `retrieved_at` è `NULL` per le righe salvate prima della
+  `0004` e si popola dal primo run successivo di ogni cron; `fetch_runs`
+  parte vuota e si riempie allo stesso modo. `regions.name` ha un vincolo
+  `UNIQUE` (migrazione `0005` — vedi "Errori noti": prima non c'era, e i
+  fetcher EU/US creavano una riga regione nuova ad ogni run)
 - `src/lib/db/queries.ts` — query di lettura (ultimo prezzo per ogni
   commodity/regione). NON filtrano per data (vedi "Errori noti")
-- `src/lib/commodityFreshness.ts` — calcola l'età dell'ultimo prezzo di
-  una commodity e se va segnalata come non aggiornata (soglia per
-  cadenza: 14gg per l'energia giornaliera, 75gg per metalli/agricole
-  mensili). Alimenta il badge "non aggiornato" nella tabella materie prime
+- `src/lib/freshness/` — modello di freshness a 3 stati (`aggiornato` /
+  `in_attesa` / `non_aggiornato`), sostituisce `commodityFreshness.ts`
+  (rimosso, faceva solo 1 soglia binaria). `config.ts` ha
+  `FRESHNESS_CONFIG`: una entry per `source:symbol` (Alpha Vantage — ogni
+  commodity ha una cadenza diversa, 1gg per energia/3gg grace, 30gg per
+  metalli-agricole/10gg grace) o per `source` da solo (`eu_weekly_oil_bulletin`,
+  `eia_us` — 7gg/3gg grace, condivisa da tutta la fonte). `compute.ts` ha
+  `computeFreshness` (calcolo puro, `now` iniettabile) e
+  `getFreshnessConfig` (lookup `source:symbol` → `source` → **lancia un
+  errore esplicito** se manca una config, mai un default silenzioso —
+  coerente col bug Alpha Vantage sotto). Oggi cablato solo sulla tabella
+  materie prime in `page.tsx` (via `LatestCommodityPrice.source`,
+  aggiunto a `queries.ts`); i carburanti non hanno ancora un badge
+  freshness (vedi "Cosa manca")
 - `src/lib/commodityDisplay.ts` — conversioni di SOLA visualizzazione
   (es. cotone da cents/pound a cents/kg); il dato grezzo salvato non si
   tocca mai
@@ -77,7 +89,10 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
     — persistenza. Usano `onConflictDoUpdate` sul vincolo unique: se la
     fonte ripropone la stessa data aggiornano il prezzo, non duplicano.
     Valorizzano `retrieved_at` con un timestamp unico per run (aggiornato
-    anche sul re-fetch dello stesso dato)
+    anche sul re-fetch dello stesso dato). `saveEuFuelPrices.ts` /
+    `saveUsFuelPrices.ts` inseriscono anche in `regions` con
+    `onConflictDoNothing({ target: regions.name })` — target esplicito,
+    vedi "Errori noti" sul vincolo `UNIQUE` mancante
   - `fetchRunLog.ts` — `startFetchRun` / `finishFetchRun`: registrano
     l'esito di ogni run in `fetch_runs`. Regola: il logging NON fa mai
     fallire il fetch (try/catch interno; `startFetchRun` torna `null` se
@@ -109,25 +124,40 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   voci). Contenuto a `max-w-7xl` (1280px). Footer piatto (bordo
   superiore, niente `rounded-t-*` né gradiente decorativo), divisori
   `border-l` tra le colonne (solo `lg`); colonna "Progetto" con
-  Metodologia + Glossario. Tabella materie prime: badge "non aggiornato"
-  nella colonna Data (da `commodityFreshness.ts`). `StatusLabel`
+  Metodologia + Glossario. Tabella materie prime: badge a 3 stati nella
+  colonna Data (da `src/lib/freshness/`) — nessun badge se `aggiornato`,
+  `system-accent-wait` (ambra/ocra) se `in_attesa`, `system-accent-down`
+  (ruggine, invariato) se `non_aggiornato`. `StatusLabel`
   ("ULTIMO DATO · <data>") ha un pallino STATICO — niente animazione, i
   dati non sono uno stream. `LinkedinGlyph` è una SVG inline (lucide non
   ha icone brand)
 - `src/app/metodologia/page.tsx` — pagina trasparenza (fonti, limiti,
   frequenza aggiornamento, licenza MIT). Spiega anche il badge "non
   aggiornato" e documenta l'API pubblica `/api/data` (sezione 05, con
-  esempio di risposta)
+  esempio di risposta). **NON ancora aggiornata (1 set 2026) al modello
+  di freshness a 3 stati**: descrive solo il badge binario di prima,
+  non menziona lo stato `in_attesa` (`system-accent-wait`)
 - `src/app/glossario/page.tsx` — pagina FAQ/glossario (WTI vs Brent,
   Weekly Oil Bulletin, EIA, cadenza giornaliera vs mensile, badge "non
   aggiornato" → rimanda a metodologia). Stesso pattern di
-  `metodologia/page.tsx` (helper `Section`, header "torna alla dashboard")
+  `metodologia/page.tsx` (helper `Section`, header "torna alla dashboard").
+  Stessa nota: prosa non aggiornata al modello a 3 stati
 - `src/components/EuropeFuelMap.tsx` — mappa interattiva (react-simple-maps,
   atlante 50m — NON usare 110m, omette paesi piccoli come Malta/Lussemburgo).
   Inquadratura stretta sull'Europa con dati (`rotate: [-13,-50]`,
   `scale: 900`, viewBox 800×490): riduce il grigio a est. Cipro e Malta
-  finiscono ai bordi sud-est. Due etichette fisse in alto a destra con
-  il paese più economico e quello più caro (benzina), calcolate dai dati
+  finiscono ai bordi sud-est. **Modifica in corso, non ancora committata
+  (1 set 2026)** — in attesa di revisione visiva locale prima del commit:
+  scala colore divergente centrata sulla media UE (`euAveragePetrol`),
+  non più rampa monocroma min/max — scarto firmato `(prezzo - media) /
+  (max - min)`, clampato con fattore `*2`, verde (`system-accent`) sotto
+  media / ruggine (`system-accent-down`) sopra, centro neutro
+  `system-border` (NON `system-panel`, troppo simile al fill "nessun
+  dato" `#eef0f3`). Box fissi "più economico/più caro" RIMOSSI (erano
+  sovrapposti alla cartografia); sostituiti da una riga sotto la mappa
+  `MINIMO | MEDIA UE | MASSIMO`. Il tooltip hover mostra comunque lo
+  scostamento testuale (`± millesimi vs media UE`) — il colore non è
+  l'unico veicolo dell'informazione
 - `src/components/FuelImpactCalculator.tsx` — calcolatore costo
   pieno/trasporti, EU vs USA
 - `src/components/MobileNav.tsx` — menu hamburger mobile. Prop `items`
@@ -139,6 +169,13 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   nessun endpoint dedicato. CSV con escaping RFC 4180 (campo quotato solo
   se contiene `,`/`"`/a-capo, virgolette raddoppiate). Usato dalla
   tabella materie prime in `page.tsx` e da `FuelPriceTable`
+- `CONTRIBUTING.md` / `.github/ISSUE_TEMPLATE/segnala-dato-errato.yml`
+  (1 set 2026) — convenzioni per contributor esterni (fonte/data/limiti
+  sempre dichiarati, niente fallimenti silenziosi, vincoli `UNIQUE`
+  prima di `onConflictDo*`) + template issue strutturato per segnalare
+  un dato che non corrisponde alla fonte ufficiale, senza scrivere
+  codice. `package.json` ha ora anche `description`/`repository`/
+  `homepage`/`license` (mancavano; `private: true` resta invariato)
 
 ## Convenzioni di stile del codice
 
@@ -167,6 +204,11 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   - `system-border-subtle` (#eef0f3) — divisori più leggeri
   - `system-accent` (#0f6b66) — verde petrolio, invariato
   - `system-accent-down` (#b34324) — ruggine, per valori in salita
+  - `system-accent-wait` (#9c8a5c) — ambra/ocra desaturata, stato
+    "in_attesa" del modello di freshness a 3 stati (`src/lib/freshness/`).
+    Saturazione/luminosità tarate per restare nella fascia sobria della
+    palette (~26% sat, vicino a `system-ink-muted`), non un ambra
+    "warning" acceso
 
   Eccezione voluta: i colori SVG grezzi dentro `EuropeFuelMap.tsx` (fill dei
   paesi senza dati, stroke dei confini) restano hex letterali perché sono
@@ -220,9 +262,24 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   sotto-giornaliere (`*/30 * * * *`, `0 * * * *`) fanno FALLIRE il deploy
 - `getLatestCommodityPrices`/`getLatestFuelPrices` non filtrano per data:
   mostrano l'ultimo valore salvato "per sempre", anche se vecchio di
-  mesi. Mitigazione PARZIALE: le materie prime hanno il badge "non
-  aggiornato" (`commodityFreshness.ts`); i carburanti no. Se cambi la
-  cadenza di una fonte, aggiorna anche le soglie in `commodityFreshness.ts`
+  mesi. Mitigazione PARZIALE: le materie prime hanno il badge freshness
+  a 3 stati (`src/lib/freshness/`); i carburanti no. Se cambi la cadenza
+  di una fonte, aggiorna anche `FRESHNESS_CONFIG` in
+  `src/lib/freshness/config.ts`
+- **`regions.name` senza vincolo `UNIQUE` (corretto in migrazione `0005`,
+  1 set 2026).** Prima, `saveEuFuelPrices.ts`/`saveUsFuelPrices.ts`
+  chiamavano `insert(regions).onConflictDoNothing()` senza un vincolo su
+  cui appoggiarsi: Postgres non aveva modo di rilevare il conflitto, quindi
+  INSERIVA sempre una riga regione nuova (una per ogni punto petrol/diesel
+  processato, non una per country). A cascata, anche il vincolo unique su
+  `retail_fuel_prices` (`region_id, fuel_type, recorded_at`) non scattava
+  mai per lo stesso paese, perché `region_id` cambiava ad ogni run: ogni
+  cron EU/US duplicava le righe-prezzo invece di aggiornarle. Bonificati
+  81 duplicati in `regions` e 54 righe-prezzo duplicate in
+  `retail_fuel_prices` (dati identici, solo `region_id`/`retrieved_at`
+  diversi — verificato prezzo per prezzo prima della cancellazione). Ora
+  `regions.name` ha `.unique()` in `schema.ts` e i due fetcher passano
+  `onConflictDoNothing({ target: regions.name })` esplicito
 
 ## Workflow con l'utente
 
@@ -247,12 +304,20 @@ Rafforzare il principio fonte/data/limiti, non diluirlo con funzioni
 decorative. Escluso per ora: redesign totale, Oceania/LatAm, media UE
 ponderata, import massivo storico, estrapolazioni causali.
 
-- **Freshness a 3 stati** (aggiornato / in attesa del nuovo dato / non
-  aggiornato), source-aware e frequency-aware, estesa anche ai
-  carburanti. Prerequisiti già in piedi: `retrieved_at` sui prezzi e
-  `fetch_runs`. Manca la logica (oggi `commodityFreshness.ts` fa solo
-  1 soglia binaria sulle sole materie prime) e i metadati di frequenza
-  attesa per fonte
+- **Freshness a 3 stati — FATTO per le materie prime (1 set 2026),
+  manca ancora per i carburanti.** `src/lib/freshness/` (config
+  source/symbol-aware + calcolo con grace period) è cablato sulla
+  tabella materie prime in `page.tsx`. Per estenderlo ai carburanti
+  serve: aggiungere `source`/`fuelType` (o region) alle query di
+  `LatestFuelPrice` (oggi non selezionano `source`, come per le
+  commodity prima del fix), e wirare il badge nella tabella/mappa
+  carburanti — la config `FRESHNESS_CONFIG` in `config.ts` ha già le
+  entry `eu_weekly_oil_bulletin`/`eia_us` pronte, manca solo l'uso
+- **Prosa metodologia/glossario da allineare al modello a 3 stati**:
+  `metodologia/page.tsx` e `glossario/page.tsx` spiegano ancora solo il
+  vecchio badge binario "non aggiornato", non menzionano `in_attesa` —
+  scollamento introdotto dal fix di freshness (1 set 2026), non ancora
+  richiuso
 - **Pagina pubblica "Stato dei dati"**: modello dati pronto
   (`fetch_runs`), pagina da costruire (ultimo tentativo / ultimo
   successo / ultimo dato / errore recente per fonte)
@@ -267,12 +332,10 @@ ponderata, import massivo storico, estrapolazioni causali.
   dal bollettino). Attenzione: `EuropeFuelMap` fa il join su
   `geo.properties.name` (inglese), serve un `displayName` separato dal
   nome-chiave
-- **Mappa — semantica cromatica** (brief punto 23): passare da rampa
-  monocroma min/max a scala divergente centrata sulla media UE
-  (`euAveragePetrol`, già passata come prop); spostare i box "più
-  caro/economico" FUORI dalla cartografia (riga `MIN | MEDIA UE | MAX`);
-  il colore non deve essere l'unico veicolo dell'informazione. È un
-  cambio di CALCOLO, non solo di stile
+- **Mappa — semantica cromatica** (brief punto 23): **FATTO nel working
+  tree, non ancora committato (1 set 2026)** — vedi la voce
+  `EuropeFuelMap.tsx` in "Architettura". In attesa di revisione visiva
+  locale prima del commit/push
 - **API v1 / permalink / "Carta del prezzo" / widget / citazioni** —
   visione a lungo termine del brief, tutto dipendente da metadati e
   freshness stabili. Non prima. `/api/data` attuale è provvisorio

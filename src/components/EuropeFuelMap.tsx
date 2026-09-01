@@ -22,12 +22,32 @@ interface Props {
   euAveragePetrol: number | null;
 }
 
-function interpolateColor(t: number): string {
-  const low = { r: 0xe3, g: 0xf0, b: 0xee };
-  const high = { r: 0x0f, g: 0x6b, b: 0x66 };
-  const r = Math.round(low.r + (high.r - low.r) * t);
-  const g = Math.round(low.g + (high.g - low.g) * t);
-  const b = Math.round(low.b + (high.b - low.b) * t);
+// Hex reali dei token system-* (vedi globals.css @theme) — lo stile SVG di
+// react-simple-maps vuole un colore risolto, non può leggere var(--color-*)
+// in modo affidabile su tutti i browser per il fill.
+const NEUTRAL_HEX = "#e2e4e9"; // system-border — centro della scala (alla media UE)
+const ACCENT_HEX = "#0f6b66"; // system-accent (verde) — sotto la media
+const ACCENT_DOWN_HEX = "#b34324"; // system-accent-down (ruggine) — sopra la media
+// system-border-subtle, INVARIATO rispetto a prima: deliberatamente diverso
+// da NEUTRAL_HEX, altrimenti "nessun dato" e "esattamente alla media UE"
+// sarebbero visivamente indistinguibili sulla mappa.
+const NO_DATA_FILL = "#eef0f3";
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const clean = hex.replace("#", "");
+  return {
+    r: parseInt(clean.slice(0, 2), 16),
+    g: parseInt(clean.slice(2, 4), 16),
+    b: parseInt(clean.slice(4, 6), 16),
+  };
+}
+
+function interpolateColor(fromHex: string, toHex: string, t: number): string {
+  const from = hexToRgb(fromHex);
+  const to = hexToRgb(toHex);
+  const r = Math.round(from.r + (to.r - from.r) * t);
+  const g = Math.round(from.g + (to.g - from.g) * t);
+  const b = Math.round(from.b + (to.b - from.b) * t);
   return `rgb(${r}, ${g}, ${b})`;
 }
 
@@ -42,19 +62,6 @@ export default function EuropeFuelMap({ prices, euAveragePetrol }: Props) {
   const petrolValues = withPetrol.map((p) => p.petrol);
   const min = Math.min(...petrolValues);
   const max = Math.max(...petrolValues);
-
-  // Estremi calcolati dai dati, mostrati come etichette fisse sulla mappa
-  // (non solo nel tooltip al passaggio del mouse): sono l'informazione che
-  // l'utente cerca per prima. `reduce` invece di sort per non allocare un
-  // nuovo array.
-  const cheapest = withPetrol.reduce<(CountryFuelData & { petrol: number }) | null>(
-    (best, p) => (best === null || p.petrol < best.petrol ? p : best),
-    null
-  );
-  const priciest = withPetrol.reduce<(CountryFuelData & { petrol: number }) | null>(
-    (best, p) => (best === null || p.petrol > best.petrol ? p : best),
-    null
-  );
 
   return (
     <div className="relative">
@@ -86,12 +93,39 @@ export default function EuropeFuelMap({ prices, euAveragePetrol }: Props) {
                 // `isHovered` sia in `default` che in `hover` il risultato è
                 // identico qualunque pseudo-stato il browser applichi.
                 const isHovered = hovered?.countryName === name;
-                const t =
+
+                // Scarto firmato dalla media UE, normalizzato sul range
+                // min-max visibile: negativo = sotto la media (più
+                // conveniente, verde), positivo = sopra (più caro, ruggine).
+                // Il range min-max resta il riferimento di scala, ma il
+                // centro della rampa cromatica è la media, non il minimo.
+                // Richiede euAveragePetrol: se manca (fonte non ancora
+                // disponibile), il paese cade nel fallback NO_DATA_FILL
+                // insieme ai paesi senza prezzo — non c'è un centro su cui
+                // posizionarlo.
+                const scarto =
                   data?.petrol !== undefined &&
                   data?.petrol !== null &&
+                  euAveragePetrol !== null &&
                   max > min
-                    ? (data.petrol - min) / (max - min)
+                    ? (data.petrol - euAveragePetrol) / (max - min)
                     : null;
+
+                // Quanto è "acceso" il colore: clampato a 1 così un outlier
+                // estremo non produce un colore fuori scala rispetto agli
+                // altri paesi. Fattore di partenza *2: un paese a metà tra
+                // la media e un estremo del range arriva già a saturazione
+                // piena — se in pagina sembra scalare troppo in fretta o
+                // troppo piano, va ricalibrato qui.
+                const intensita =
+                  scarto !== null ? Math.min(Math.abs(scarto) * 2, 1) : null;
+
+                const fillColor =
+                  scarto === null || intensita === null
+                    ? NO_DATA_FILL
+                    : scarto < 0
+                      ? interpolateColor(NEUTRAL_HEX, ACCENT_HEX, intensita)
+                      : interpolateColor(NEUTRAL_HEX, ACCENT_DOWN_HEX, intensita);
 
                 return (
                   <Geography
@@ -103,7 +137,7 @@ export default function EuropeFuelMap({ prices, euAveragePetrol }: Props) {
                     onMouseLeave={() => setHovered(null)}
                     style={{
                       default: {
-                        fill: t !== null ? interpolateColor(t) : "#eef0f3",
+                        fill: fillColor,
                         stroke: isHovered
                           ? "var(--color-system-accent)"
                           : "#ffffff",
@@ -112,7 +146,7 @@ export default function EuropeFuelMap({ prices, euAveragePetrol }: Props) {
                         cursor: data ? "pointer" : "default",
                       },
                       hover: {
-                        fill: t !== null ? interpolateColor(t) : "#eef0f3",
+                        fill: fillColor,
                         stroke: isHovered
                           ? "var(--color-system-accent)"
                           : "#ffffff",
@@ -121,7 +155,7 @@ export default function EuropeFuelMap({ prices, euAveragePetrol }: Props) {
                         cursor: data ? "pointer" : "default",
                       },
                       pressed: {
-                        fill: t !== null ? interpolateColor(t) : "#eef0f3",
+                        fill: fillColor,
                         outline: "none",
                       },
                     }}
@@ -132,39 +166,6 @@ export default function EuropeFuelMap({ prices, euAveragePetrol }: Props) {
           </Geographies>
         </ZoomableGroup>
       </ComposableMap>
-
-      {/* Etichette fisse con gli estremi, in alto a destra (il tooltip
-          hover sta in alto a sinistra, così non si sovrappongono). */}
-      {cheapest && priciest && (
-        <div className="pointer-events-none absolute right-3 top-3 flex flex-col gap-1.5 text-xs">
-          <div className="rounded-md border border-system-border bg-white/90 px-2.5 py-1.5 shadow-sm backdrop-blur-sm">
-            <div className="font-mono uppercase tracking-wider text-system-ink-muted">
-              Più economico
-            </div>
-            <div className="mt-0.5 flex items-baseline justify-between gap-3">
-              <span className="font-medium text-system-ink">
-                {cheapest.countryName}
-              </span>
-              <span className="font-mono tabular-nums text-system-accent">
-                {cheapest.petrol.toFixed(3)} €/L
-              </span>
-            </div>
-          </div>
-          <div className="rounded-md border border-system-border bg-white/90 px-2.5 py-1.5 shadow-sm backdrop-blur-sm">
-            <div className="font-mono uppercase tracking-wider text-system-ink-muted">
-              Più caro
-            </div>
-            <div className="mt-0.5 flex items-baseline justify-between gap-3">
-              <span className="font-medium text-system-ink">
-                {priciest.countryName}
-              </span>
-              <span className="font-mono tabular-nums text-system-accent-down">
-                {priciest.petrol.toFixed(3)} €/L
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
 
       {hovered && (
         <div className="pointer-events-none absolute left-4 top-4 rounded-md border border-system-border bg-white px-3 py-2 text-sm shadow-md">
@@ -195,15 +196,26 @@ export default function EuropeFuelMap({ prices, euAveragePetrol }: Props) {
         </div>
       )}
 
-      <div className="mt-3 flex items-center gap-2 text-xs text-system-ink-muted">
-        <span className="font-mono">{min.toFixed(2)} €/L</span>
-        <div
-          className="h-2 flex-1 rounded-full"
-          style={{
-            background: `linear-gradient(to right, ${interpolateColor(0)}, ${interpolateColor(1)})`,
-          }}
-        />
-        <span className="font-mono">{max.toFixed(2)} €/L</span>
+      {/* Riga sintetica coi 3 riferimenti della scala divergente (min,
+          centro=media UE, max) — sostituisce la barra sfumata min/max di
+          prima, che descriveva una rampa monocroma non più in uso. Divisori
+          border-l invece di un glifo "|": stesso pattern già usato altrove
+          nel progetto (nav "tab bar", colonne del footer). */}
+      <div className="mt-3 flex items-center justify-between text-xs text-system-ink-muted">
+        <span className="font-mono">
+          <span className="uppercase tracking-wider">Minimo</span>{" "}
+          <span className="tabular-nums text-system-ink">{min.toFixed(2)} €/L</span>
+        </span>
+        <span className="border-l border-system-border-subtle pl-3 font-mono">
+          <span className="uppercase tracking-wider">Media UE</span>{" "}
+          <span className="tabular-nums text-system-ink">
+            {euAveragePetrol !== null ? `${euAveragePetrol.toFixed(2)} €/L` : "n/d"}
+          </span>
+        </span>
+        <span className="border-l border-system-border-subtle pl-3 font-mono">
+          <span className="uppercase tracking-wider">Massimo</span>{" "}
+          <span className="tabular-nums text-system-ink">{max.toFixed(2)} €/L</span>
+        </span>
       </div>
       <p className="mt-2 text-xs text-system-ink-muted">
         Scorri con la rotellina per ingrandire, trascina per spostarti.
