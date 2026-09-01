@@ -662,8 +662,9 @@ export default async function Home() {
                     href={GITHUB_URL}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-system-ink-secondary transition-colors hover:text-system-accent"
+                    className="inline-flex items-center gap-2 text-system-ink-secondary transition-colors hover:text-system-accent"
                   >
+                    <Code2 size={15} />
                     Codice sorgente
                   </a>
                 </li>
