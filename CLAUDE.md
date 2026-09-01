@@ -132,7 +132,11 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   colonna Data (da `src/lib/freshness/`) — nessun badge se `aggiornato`,
   `system-accent-wait` (ambra/ocra) se `in_attesa`, `system-accent-down`
   (ruggine, invariato) se `non_aggiornato`. `LinkedinGlyph` è una SVG
-  inline (lucide non ha icone brand).
+  inline (lucide non ha icone brand). Footer, colonna "Progetto": il link
+  "Codice sorgente" (1 set 2026) riusa `Code2` di lucide — già usato per
+  lo stesso `GITHUB_URL` nell'header — invece di una SVG brand dedicata,
+  per coerenza col fatto che l'header stesso non tenta un logo GitHub
+  reale (non esiste in lucide 1.34.0, vedi "Errori noti").
 
   **Header (1 set 2026, brief punti 17+25)**: "Prezzario" è ora il
   wordmark visivo dominante — icona `ProvenanceStamp` 36px + testo
@@ -198,6 +202,16 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   nessun endpoint dedicato. CSV con escaping RFC 4180 (campo quotato solo
   se contiene `,`/`"`/a-capo, virgolette raddoppiate). Usato dalla
   tabella materie prime in `page.tsx` e da `FuelPriceTable`
+- `src/components/PriceHistoryChart.tsx` — grafico storico con selettore
+  a chip (una serie alla volta — unità/valute incompatibili tra serie,
+  vedi commento nel file). `AreaChart`/`Area` di recharts (1 set 2026,
+  era `LineChart`/`Line`), `type="monotone"` invariato: sotto la linea
+  c'è una `<linearGradient>` che sfuma da `system-accent` (opacità 0.25)
+  a trasparente. L'`id` del gradiente viene da `useId()`, NON un id
+  fisso in stringa — la homepage monta due istanze insieme (materie
+  prime + carburanti) e un id fisso in `<defs>` farebbe collidere i due
+  `<linearGradient>` nello stesso DOM (verificato: senza `useId()` i due
+  `url(#id)` puntano entrambi alla prima `<defs>` trovata)
 - `CONTRIBUTING.md` / `.github/ISSUE_TEMPLATE/segnala-dato-errato.yml`
   (1 set 2026) — convenzioni per contributor esterni (fonte/data/limiti
   sempre dichiarati, niente fallimenti silenziosi, vincoli `UNIQUE`
