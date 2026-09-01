@@ -45,6 +45,19 @@ type FuelPriceTableProps = {
  * Di default mostriamo solo gli "estremi" (i paesi più economici e più
  * cari), che sono l'informazione più interessante a colpo d'occhio — il
  * resto è raggiungibile cercando o espandendo.
+ *
+ * Ordinamento: i paesi sono sempre ordinati per prezzo medio (benzina +
+ * diesel) crescente (`regions`, sotto) — è quello che rende "estremi"
+ * ben definiti (i primi/ultimi N invece di una scelta arbitraria).
+ *
+ * Tre modalità di visualizzazione, mutuamente esclusive (`visibleRegions`):
+ * ricerca attiva → solo i risultati che matchano il nome paese, ignorando
+ * espanso/compresso; nessuna ricerca + compresso (default) → anteprima
+ * "metà più economici, metà più cari"; nessuna ricerca + espanso (dopo
+ * "Mostra tutti") → l'elenco completo. Se i paesi totali sono ≤
+ * `previewRegionsCount` (`needsControls` = false, es. Nord America con
+ * solo gli USA), ricerca e pulsante scompaiono: con pochi paesi sarebbero
+ * inutili, si mostra sempre tutto.
  */
 export function FuelPriceTable({
   continentLabel,
@@ -124,7 +137,7 @@ export function FuelPriceTable({
   }, [regions, searchedRegions, needsControls, expanded, previewRegionsCount]);
 
   return (
-    <div className="overflow-hidden rounded-lg border border-system-border bg-white">
+    <div className="overflow-hidden rounded-lg border border-system-border bg-system-surface">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-system-border bg-system-bg px-4 py-2">
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-xs font-semibold uppercase tracking-wide text-system-ink-secondary">
@@ -152,7 +165,7 @@ export function FuelPriceTable({
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Cerca paese..."
                 aria-label={`Cerca paese in ${continentLabel}`}
-                className="w-full rounded-md border border-system-border bg-white py-1 pl-7 pr-2 text-xs text-system-ink placeholder:text-system-ink-muted focus:border-system-accent focus:outline-none sm:w-auto"
+                className="w-full rounded-md border border-system-border bg-system-surface py-1 pl-7 pr-2 text-xs text-system-ink placeholder:text-system-ink-muted focus:border-system-accent focus:outline-none sm:w-auto"
               />
             </div>
             {searchedRegions === null && (

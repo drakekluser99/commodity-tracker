@@ -263,7 +263,7 @@ export default async function Home() {
 
   return (
     <div className="min-h-screen bg-system-bg text-system-ink">
-      <header className="border-b border-system-border bg-white">
+      <header className="border-b border-system-border bg-system-surface">
         <div className="mx-auto max-w-7xl px-6 py-10">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
@@ -392,7 +392,7 @@ export default async function Home() {
                 return (
                   <div
                     key={m.key}
-                    className="rounded-lg border border-system-border bg-white p-4"
+                    className="rounded-lg border border-system-border bg-system-surface p-4"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -441,7 +441,7 @@ export default async function Home() {
               <span className="font-mono text-xs text-system-ink-muted">01 /</span>
               <h2 className="text-lg font-semibold text-system-ink">Prezzo benzina in Europa</h2>
             </div>
-            <div className="mt-4 rounded-lg border border-system-border bg-white p-4">
+            <div className="mt-4 rounded-lg border border-system-border bg-system-surface p-4">
               <EuropeFuelMap prices={europeanFuelData} euAveragePetrol={europeAverage.petrol} />
             </div>
             <SourceNote>
@@ -486,7 +486,7 @@ export default async function Home() {
           {commodityPrices.length === 0 ? (
             <EmptyState label="Nessun dato ancora. Il cron job non è ancora girato per questa fonte." />
           ) : (
-            <div className="mt-4 overflow-x-auto rounded-lg border border-system-border bg-white">
+            <div className="mt-4 overflow-x-auto rounded-lg border border-system-border bg-system-surface">
               <table className="w-full min-w-[480px] text-sm">
                 <thead>
                   {/* Intestazioni in stile terminale: monospace + maiuscolo
@@ -597,7 +597,7 @@ export default async function Home() {
         </section>
       </main>
 
-      <footer className="mt-8 border-t border-system-border bg-white">
+      <footer className="mt-8 border-t border-system-border bg-system-surface">
         <div className="mx-auto max-w-7xl px-6 py-12">
           {/* Colonne del footer separate da divisori verticali (border-l col
               colore bordo del design system) invece che dal solo spazio
@@ -714,7 +714,7 @@ function SourceNote({ children }: { children: React.ReactNode }) {
 
 function EmptyState({ label }: { label: string }) {
   return (
-    <div className="mt-4 rounded-lg border border-dashed border-system-border bg-white px-4 py-8 text-center text-sm text-system-ink-muted">
+    <div className="mt-4 rounded-lg border border-dashed border-system-border bg-system-surface px-4 py-8 text-center text-sm text-system-ink-muted">
       {label}
     </div>
   );

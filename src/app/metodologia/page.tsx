@@ -9,7 +9,7 @@ export const metadata = {
 export default function Metodologia() {
   return (
     <div className="min-h-screen bg-system-bg text-system-ink">
-      <header className="border-b border-system-border bg-white">
+      <header className="border-b border-system-border bg-system-surface">
         <div className="mx-auto max-w-3xl px-6 py-8">
           <Link
             href="/"

@@ -190,9 +190,19 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   sovrapposti alla cartografia); sostituiti da una riga sotto la mappa
   `MINIMO | MEDIA UE | MASSIMO`. Il tooltip hover mostra comunque lo
   scostamento testuale (`± millesimi vs media UE`) — il colore non è
-  l'unico veicolo dell'informazione
+  l'unico veicolo dell'informazione. Header doc in testa al file (1 set
+  2026, audit design system) spiega la formula della scala divergente
+  direttamente nel codice, non solo qui
 - `src/components/FuelImpactCalculator.tsx` — calcolatore costo
-  pieno/trasporti, EU vs USA
+  pieno/trasporti, EU vs USA, senza conversione EUR/USD (valute
+  originali fianco a fianco). Header doc in testa al file (1 set 2026,
+  audit design system) — prima ne era privo
+- `src/components/FuelPriceTable.tsx` — tabella carburanti con ricerca
+  live e anteprima compressa (metà paesi più economici, metà più cari;
+  ordinamento per prezzo medio benzina+diesel crescente). Header doc
+  esistente ampliato (1 set 2026, audit design system) per coprire anche
+  ricerca/ordinamento/modalità di visualizzazione, non solo il "perché"
+  dell'anteprima
 - `src/components/MobileNav.tsx` — menu hamburger mobile. Prop `items`
   (ancore alla dashboard, con icona) e `pageLinks` (link a pagine —
   Metodologia, Glossario — resi come `next/link`, senza icona). Stesso
@@ -239,7 +249,16 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   `@theme` (Tailwind v4, non `tailwind.config.ts`). Non scrivere più hex a
   mano nelle classi — usare sempre le utility generate:
   - `system-bg` (#fafafa) — sfondo pagina
-  - `system-panel` (#f2f3f5) — sfondo pannelli secondari
+  - `system-panel` (#f2f3f5) — sfondo pannelli secondari, PIATTO, stesso
+    piano della pagina (es. hover di riga tabella)
+  - `system-surface` (#ffffff, 1 set 2026) — sfondo di una card/pannello
+    SOLLEVATO sopra `system-bg` (header, footer, tabelle, tooltip,
+    dropdown, input di ricerca), sempre accoppiato a un bordo o un'ombra.
+    Diverso da `system-panel` proprio per questo: non è piatto. Introdotto
+    per dare un nome ai 15 usi ripetuti di `bg-white` sparsi nel sito
+    (stesso ruolo, nessun token dedicato prima) — trovati durante l'audit
+    design system sotto, migrati 1:1 (nessuna modifica visiva: bianco
+    puro prima e dopo)
   - `system-ink` (#111318) — testo principale
   - `system-ink-secondary` (#5b6472) — testo secondario (paragrafi, nav)
   - `system-ink-muted` (#6b7280) — dettagli minori (text-xs, celle tabella)
@@ -256,6 +275,19 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   Eccezione voluta: i colori SVG grezzi dentro `EuropeFuelMap.tsx` (fill dei
   paesi senza dati, stroke dei confini) restano hex letterali perché sono
   attributi JS/SVG, non classi Tailwind — non vanno migrati.
+
+  **Audit design system (1 set 2026)**: verifica manuale (grep su `src/`
+  per hex/classi colore fuori palette e per spaziature arbitrarie, lettura
+  dei componenti principali) — non l'esecuzione di uno strumento o una
+  skill dedicata (nessuna skill con questo nome è installata in questo
+  progetto). Ha prodotto il token `system-surface` sopra e ha aggiunto/
+  ampliato la documentazione di intestazione di `EuropeFuelMap.tsx` e
+  `FuelImpactCalculator.tsx` (mancava del tutto) e `FuelPriceTable.tsx`
+  (esisteva già ma copriva solo il "perché" dell'anteprima compressa, non
+  ricerca/ordinamento — vedi sotto). Nessun'altra criticità trovata:
+  naming dei componenti coerente, `SystemCard`/`StatusLabel` ancora usati
+  come documentato, nessuna spaziatura arbitraria oltre a quella già nota
+  sul wordmark header.
 - Font numeri: sempre `font-mono tabular-nums` per allineamento colonne
 - Ogni sezione dati ha una nota "Fonte: ..." sotto (componente
   `SourceNote`) — non rimuoverle, è il principio cardine del progetto

@@ -42,6 +42,23 @@ function useNumericField(defaultValue: number) {
   return { raw, setRaw, numericValue };
 }
 
+/**
+ * Calcolatore d'impatto costi carburante: Europa (media UE) vs Stati Uniti,
+ * fianco a fianco, ciascuna regione nella propria valuta originale.
+ *
+ * NON converte EUR↔USD: un tasso di cambio aggiornato non è ancora
+ * applicato (vedi nota nel testo sotto la tabella), quindi nessuna cella
+ * è evidenziata come "più conveniente" tra le due regioni — sarebbe un
+ * confronto fuorviante tra valute diverse. Confronta solo entro la stessa
+ * riga/colonna (es. benzina Europa vs benzina Europa nel tempo), non tra
+ * colonne.
+ *
+ * Righe della tabella: prezzo benzina/diesel (dato grezzo) e due metriche
+ * derivate, evidenziate (`strong: true`) perché pensate per essere lette
+ * isolatamente — "pieno auto" (prezzo benzina × capacità serbatoio,
+ * editabile dall'utente, default 50L) e "costo carburante/100km camion"
+ * (prezzo diesel × consumo, editabile, default 33L/100km).
+ */
 export default function FuelImpactCalculator({ europe, us }: Props) {
   const tank = useNumericField(DEFAULT_CAR_TANK_LITERS);
   const truck = useNumericField(DEFAULT_TRUCK_CONSUMPTION);
@@ -103,7 +120,7 @@ export default function FuelImpactCalculator({ europe, us }: Props) {
   ];
 
   return (
-    <div className="rounded-lg border border-system-border bg-white p-6">
+    <div className="rounded-lg border border-system-border bg-system-surface p-6">
       <div className="grid gap-6 sm:grid-cols-2">
         <label className="block">
           <span className="text-xs font-medium uppercase tracking-wide text-system-ink-secondary">

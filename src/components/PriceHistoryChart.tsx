@@ -47,7 +47,7 @@ export function PriceHistoryChart({
 
   if (!selected || selected.points.length === 0) {
     return (
-      <div className="rounded-lg border border-system-border bg-white p-4">
+      <div className="rounded-lg border border-system-border bg-system-surface p-4">
         <h3 className="mb-2 text-sm font-semibold text-system-ink">{title}</h3>
         <p className="text-sm text-system-ink-muted">
           Dati storici insufficienti per questo periodo.
@@ -57,7 +57,7 @@ export function PriceHistoryChart({
   }
 
   return (
-    <div className="rounded-lg border border-system-border bg-white p-4">
+    <div className="rounded-lg border border-system-border bg-system-surface p-4">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h3 className="text-sm font-semibold text-system-ink">{title}</h3>
         <div className="flex flex-wrap gap-1.5">

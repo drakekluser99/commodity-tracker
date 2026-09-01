@@ -42,6 +42,17 @@
 @theme {
   --color-system-bg: #fafafa;
   --color-system-panel: #f2f3f5;
+  /*
+   * `system-surface` (#ffffff) — sfondo di una card/pannello SOLLEVATO
+   * sopra `system-bg` (header, footer, tabelle, tooltip, dropdown, input
+   * di ricerca): sempre accoppiato a un bordo o un'ombra che lo separa
+   * dalla pagina. Diverso da `system-panel`, che non è "sollevato" ma
+   * uno sfondo secondario piatto nello stesso piano della pagina (es.
+   * hover di riga). Prima di questo token il ruolo esisteva già in tutto
+   * il sito come `bg-white` ripetuto — bianco puro, non un token della
+   * palette `system-*`.
+   */
+  --color-system-surface: #ffffff;
   --color-system-ink: #111318;
   /*
    * Due grigi per il testo, non uno solo: il progetto distingue due

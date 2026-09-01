@@ -28,10 +28,11 @@ interface Props {
 const NEUTRAL_HEX = "#e2e4e9"; // system-border — centro della scala (alla media UE)
 const ACCENT_HEX = "#0f6b66"; // system-accent (verde) — sotto la media
 const ACCENT_DOWN_HEX = "#b34324"; // system-accent-down (ruggine) — sopra la media
-// system-border-subtle, INVARIATO rispetto a prima: deliberatamente diverso
-// da NEUTRAL_HEX, altrimenti "nessun dato" e "esattamente alla media UE"
-// sarebbero visivamente indistinguibili sulla mappa.
-const NO_DATA_FILL = "#eef0f3";
+const NO_DATA_FILL = "#eef0f3"; // system-border-subtle — fallback "nessun dato".
+// INVARIATO rispetto a prima: deliberatamente diverso da NEUTRAL_HEX
+// (system-border, il centro della scala), altrimenti "nessun dato" e
+// "esattamente alla media UE" sarebbero visivamente indistinguibili sulla
+// mappa.
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
   const clean = hex.replace("#", "");
@@ -51,6 +52,28 @@ function interpolateColor(fromHex: string, toHex: string, t: number): string {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
+/**
+ * Mappa interattiva d'Europa colorata per prezzo benzina (react-simple-maps,
+ * atlante 50m). Zoom con rotellina, pan trascinando; hover su un paese apre
+ * un tooltip col dettaglio benzina/diesel e lo scostamento dalla media UE.
+ *
+ * Scala cromatica DIVERGENTE centrata sulla media UE, non una rampa
+ * monocroma min→max: ogni paese riceve uno scarto FIRMATO dalla media,
+ * normalizzato sul range min-max visibile:
+ *
+ *   scarto = (prezzo_paese - media_UE) / (max - min)
+ *
+ * negativo = sotto media (più conveniente, verde `system-accent`),
+ * positivo = sopra media (più caro, ruggine `system-accent-down`). Il
+ * colore neutro (`system-border`) è il CENTRO della scala, non il minimo.
+ * L'intensità del colore è `|scarto| * 2` clampata a 1, così un solo
+ * outlier estremo non schiaccia la scala per tutti gli altri paesi (per
+ * il dettaglio riga per riga vedi i commenti su `scarto`/`intensita` più
+ * sotto, dentro il render). Se manca `euAveragePetrol` o il prezzo del
+ * paese, non c'è un centro su cui posizionare lo scarto: il paese cade nel
+ * fallback `NO_DATA_FILL`, indistinguibile a vista da "nessun dato" — è
+ * corretto, perché per quel paese la scala divergente non è calcolabile.
+ */
 export default function EuropeFuelMap({ prices, euAveragePetrol }: Props) {
   const [hovered, setHovered] = useState<CountryFuelData | null>(null);
 
@@ -168,7 +191,7 @@ export default function EuropeFuelMap({ prices, euAveragePetrol }: Props) {
       </ComposableMap>
 
       {hovered && (
-        <div className="pointer-events-none absolute left-4 top-4 rounded-md border border-system-border bg-white px-3 py-2 text-sm shadow-md">
+        <div className="pointer-events-none absolute left-4 top-4 rounded-md border border-system-border bg-system-surface px-3 py-2 text-sm shadow-md">
           <div className="font-medium">{hovered.countryName}</div>
           {hovered.petrol !== null && (
             <div className="mt-1 flex items-center justify-between gap-4">

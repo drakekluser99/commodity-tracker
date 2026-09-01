@@ -46,7 +46,7 @@ export default function MobileNav({ items, pageLinks, githubUrl }: Props) {
            arrotondati; niente padding verticale sul contenitore così i
            divisori arrivano ai bordi. Hover coerente col desktop
            (bg-system-bg + testo accent). */
-        <div className="absolute right-0 top-full z-20 mt-2 w-56 overflow-hidden rounded-lg border border-system-border bg-white shadow-lg">
+        <div className="absolute right-0 top-full z-20 mt-2 w-56 overflow-hidden rounded-lg border border-system-border bg-system-surface shadow-lg">
           {items.map(({ href, label }) => {
             const Icon = ICONS[href] ?? Globe2;
             return (
