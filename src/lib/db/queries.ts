@@ -9,6 +9,7 @@ export interface LatestCommodityPrice {
   unit: string;
   price: string;
   recordedAt: Date;
+  source: string;
 }
 
 export interface LatestFuelPrice {
@@ -42,6 +43,7 @@ export async function getLatestCommodityPrices(): Promise<
       unit: commodities.unit,
       price: priceHistory.price,
       recordedAt: priceHistory.recordedAt,
+      source: priceHistory.source,
     })
     .from(priceHistory)
     .innerJoin(commodities, eq(priceHistory.commodityId, commodities.id))

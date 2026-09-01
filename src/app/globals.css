@@ -33,7 +33,11 @@
  *
  * `accent` = stesso verde petrolio già in uso (#0f6b66): continuità di
  * brand. `accent-down` = ruggine invece del rosso semaforico da app di
- * trading, per restare nel tema "materie prime / terra".
+ * trading, per restare nel tema "materie prime / terra". `accent-wait`
+ * = ambra/ocra, terzo colore semantico per il modello di freshness a 3
+ * stati (aggiornato/in_attesa/non_aggiornato — vedi src/lib/freshness):
+ * stessa famiglia "terra" di accent-down ma un tono caldo neutro, non
+ * un allarme — comunica "in attesa del prossimo dato", non un problema.
  */
 @theme {
   --color-system-bg: #fafafa;
@@ -65,6 +69,7 @@
   --color-system-border-strong: #111318;
   --color-system-accent: #0f6b66;
   --color-system-accent-down: #b34324;
+  --color-system-accent-wait: #a3781a;
 }
 
 body {

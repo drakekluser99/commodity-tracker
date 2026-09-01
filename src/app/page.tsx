@@ -11,7 +11,7 @@ import {
   formatPercent,
   shortUnit,
 } from "@/lib/format";
-import { commodityFreshness } from "@/lib/commodityFreshness";
+import { computeFreshness, getFreshnessConfig } from "@/lib/freshness/compute";
 import EuropeFuelMap from "@/components/EuropeFuelMap";
 import FuelImpactCalculator from "@/components/FuelImpactCalculator";
 import MobileNav from "@/components/MobileNav";
@@ -118,7 +118,7 @@ export default async function Home() {
   const commoditySeries = groupCommodityHistory(commodityHistory);
 
   // Timestamp unico per il calcolo di freschezza di tutte le righe (vedi
-  // src/lib/commodityFreshness.ts). Server Component force-dynamic,
+  // src/lib/freshness/compute.ts). Server Component force-dynamic,
   // ri-renderizzato a ogni richiesta: "ora" è esattamente ciò che serve.
   const now = new Date();
 
@@ -130,12 +130,18 @@ export default async function Home() {
   // che conserva la precisione esatta del valore salvato.
   const commodityRows = commodityPrices.map((c) => {
     const display = displayCommodityPrice(c.symbol, parseFloat(c.price), c.unit);
+    const freshnessConfig = getFreshnessConfig(c.source, c.symbol);
+    const ageDays = Math.floor(
+      (now.getTime() - c.recordedAt.getTime()) / (1000 * 60 * 60 * 24)
+    );
     return {
       ...c,
       displayPrice:
         display.unit === c.unit ? c.price : display.price.toFixed(4),
       displayUnit: display.unit,
-      freshness: commodityFreshness(c.recordedAt, c.category, now),
+      freshnessState: computeFreshness(c.recordedAt, freshnessConfig, now),
+      freshnessLabel: freshnessConfig.label,
+      ageDays,
     };
   });
 
@@ -452,16 +458,16 @@ export default async function Home() {
                       </td>
                       <td className="px-4 py-3 text-right text-system-ink-muted">
                         <span className="inline-flex items-center gap-2">
-                          {c.freshness.stale && (
+                          {c.freshnessState !== "aggiornato" && (
                             <span
-                              title={`Ultimo dato ${c.freshness.ageDays} giorni fa. La fonte aggiorna questa serie ${
-                                c.freshness.cadence === "daily"
-                                  ? "ogni giorno di mercato"
-                                  : "una volta al mese"
-                              }: il valore mostrato potrebbe non essere quello corrente.`}
-                              className="rounded border border-system-accent-down/40 px-1.5 py-0.5 font-mono text-[10px] uppercase leading-none tracking-wider text-system-accent-down"
+                              title={`Ultimo dato ${c.ageDays} giorni fa. ${c.freshnessLabel}: il valore mostrato potrebbe non essere quello corrente.`}
+                              className={
+                                c.freshnessState === "non_aggiornato"
+                                  ? "rounded border border-system-accent-down/40 px-1.5 py-0.5 font-mono text-[10px] uppercase leading-none tracking-wider text-system-accent-down"
+                                  : "rounded border border-system-accent-wait/40 px-1.5 py-0.5 font-mono text-[10px] uppercase leading-none tracking-wider text-system-accent-wait"
+                              }
                             >
-                              non aggiornato
+                              {c.freshnessState === "non_aggiornato" ? "non aggiornato" : "in attesa"}
                             </span>
                           )}
                           {formatDate(c.recordedAt)}
