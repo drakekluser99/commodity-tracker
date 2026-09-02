@@ -440,3 +440,11 @@ ponderata, import massivo storico, estrapolazioni causali.
   modifiche di oggi (wordmark + fascia sintetica, commit `270b23c` e
   `f266eb4`) — controllare che `ok: true` e che i valori di benzina/
   diesel UE nella fascia sintetica si aggiornino di conseguenza
+
+## Skill: vercel-react-best-practices
+
+Skill installata in .claude/skills/vercel-react-best-practices/.
+Consultare per: eliminazione di waterfall async, ottimizzazione bundle
+size (dynamic import, barrel imports), performance server-side (React.cache,
+parallel fetching), re-render inutili, pattern di rendering.
+Guida completa in AGENTS.md, regole singole in rules/*.md.
