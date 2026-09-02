@@ -7,6 +7,7 @@ import {
   Geography,
   ZoomableGroup,
 } from "react-simple-maps";
+import { localizedCountryName } from "@/lib/countryNames";
 
 const GEO_URL =
   "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json";
@@ -192,7 +193,9 @@ export default function EuropeFuelMap({ prices, euAveragePetrol }: Props) {
 
       {hovered && (
         <div className="pointer-events-none absolute left-4 top-4 rounded-md border border-system-border bg-system-surface px-3 py-2 text-sm shadow-md">
-          <div className="font-medium">{hovered.countryName}</div>
+          <div className="font-medium">
+            {localizedCountryName(hovered.countryName)}
+          </div>
           {hovered.petrol !== null && (
             <div className="mt-1 flex items-center justify-between gap-4">
               <span className="text-xs text-system-ink-muted">Benzina</span>

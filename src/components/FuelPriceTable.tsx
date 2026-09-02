@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { DownloadDataButtons } from "./DownloadDataButtons";
 import { formatFuelPrice, currencySymbol } from "@/lib/format";
+import { localizedCountryName } from "@/lib/countryNames";
 
 // Colonne dell'export (CSV/JSON). Ordine = ordine nel file.
 const FUEL_EXPORT_COLUMNS = [
@@ -115,7 +116,14 @@ export function FuelPriceTable({
   const searchedRegions = useMemo(() => {
     if (!query.trim()) return null; // null = nessuna ricerca attiva
     const q = query.trim().toLowerCase();
-    return regions.filter((r) => r.regionName.toLowerCase().includes(q));
+    // Match sia sul nome grezzo (inglese, come da fonte) sia su quello
+    // localizzato in italiano: digitando "Germania" o "Germany" si trova
+    // lo stesso paese.
+    return regions.filter(
+      (r) =>
+        r.regionName.toLowerCase().includes(q) ||
+        localizedCountryName(r.regionName).toLowerCase().includes(q),
+    );
   }, [regions, query]);
 
   const visibleRegions = useMemo(() => {
@@ -211,7 +219,9 @@ export function FuelPriceTable({
                     key={`${regionName}-${f.fuelType}`}
                     className="border-b border-system-border-subtle transition-colors last:border-0 hover:bg-system-bg"
                   >
-                    <td className="px-4 py-3">{regionName}</td>
+                    <td className="px-4 py-3">
+                      {localizedCountryName(regionName)}
+                    </td>
                     <td className="px-4 py-3 text-system-ink-secondary capitalize">
                       {f.fuelType === "petrol" ? "Benzina" : "Diesel"}
                     </td>

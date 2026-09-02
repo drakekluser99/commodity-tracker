@@ -409,10 +409,19 @@ ponderata, import massivo storico, estrapolazioni causali.
   toccare il vincolo unique `(commodity_id, recorded_at)`, il tie-break
   di `getLatest*` e il dedup nello storico: va progettato a parte, NON
   con un insert puro (reintrodurrebbe il bug dei duplicati)
-- **Localizzazione nomi paese** in italiano (oggi "Germany", "Poland"
-  dal bollettino). Attenzione: `EuropeFuelMap` fa il join su
-  `geo.properties.name` (inglese), serve un `displayName` separato dal
-  nome-chiave
+- **Localizzazione nomi paese — FATTO (2 set 2026)** per tabella
+  carburanti e tooltip mappa. `src/lib/countryNames.ts`
+  (`COUNTRY_NAMES_IT` + `localizedCountryName`, fallback esplicito al
+  nome originale): mappa verificata contro i 28 valori distinti reali di
+  `regions.name` (27 UE + `United States`). È SOLO presentazione — il
+  nome inglese resta la chiave grezza per il join di `EuropeFuelMap`
+  (`geo.properties.name`, righe ~109-110, non toccato) e per l'export
+  CSV/JSON (`exportRows.paese` in `FuelPriceTable`, non toccato). La
+  ricerca di `FuelPriceTable` matcha sia il nome inglese sia quello
+  italiano (digitare "Germania" o "Germany" trova lo stesso paese).
+  Manca ancora: nomi paese nella legenda/etichette estremi della mappa e
+  nelle serie del grafico carburanti (oggi ancora "media UE" aggregata,
+  non per-paese, quindi non urgente)
 - **Calcolatore d'impatto — manca la dimensione temporale/comparativa**
   (brief punto 14, verificato 1 set 2026): `FuelImpactCalculator.tsx`
   mostra solo prezzi ATTUALI (benzina/diesel, costo pieno auto, costo
