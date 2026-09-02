@@ -448,3 +448,10 @@ Consultare per: eliminazione di waterfall async, ottimizzazione bundle
 size (dynamic import, barrel imports), performance server-side (React.cache,
 parallel fetching), re-render inutili, pattern di rendering.
 Guida completa in AGENTS.md, regole singole in rules/*.md.
+
+## Skill: frontend-design
+
+Skill installata in .claude/skills/frontend-design/.
+Consultare per: direzione estetica quando si costruisce nuova UI o si
+ridisegna quella esistente — scelte di palette, accoppiamento tipografico,
+layout che non sembrino default templatizzati. Dettagli in SKILL.md.
