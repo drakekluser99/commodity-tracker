@@ -14,6 +14,7 @@ import { formatFuelPrice, formatDate, currencySymbol } from "@/lib/format";
 import { computeFreshness, getFreshnessConfig } from "@/lib/freshness/compute";
 import { SystemCard } from "@/components/SystemCard";
 import { ProvenanceStamp } from "@/components/ProvenanceStamp";
+import { SourceNote } from "@/components/SourceNote";
 
 // Come la home: i dati cambiano ogni settimana (bollettino UE il giovedì) e
 // arrivano da un cron, non da una build. `force-dynamic` legge il database
@@ -229,17 +230,11 @@ export default async function CountryPage({ params }: PageProps) {
           </p>
         </SystemCard>
 
-        <p className="mt-2 flex items-start gap-1.5 font-mono text-xs uppercase tracking-wider text-system-ink-muted">
-          <ProvenanceStamp
-            size={14}
-            className="mt-0.5 shrink-0 text-system-accent"
-          />
-          <span>
-            Fonte: Bollettino Petrolifero Settimanale, Commissione Europea ·
-            Ultima rilevazione:{" "}
-            {country.recordedAt ? formatDate(country.recordedAt) : "—"}
-          </span>
-        </p>
+        <SourceNote sources={["eu-commission"]}>
+          Fonte: Bollettino Petrolifero Settimanale, Commissione Europea ·
+          Ultima rilevazione:{" "}
+          {country.recordedAt ? formatDate(country.recordedAt) : "—"}
+        </SourceNote>
       </main>
     </div>
   );

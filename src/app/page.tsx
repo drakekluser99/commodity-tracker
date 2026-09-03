@@ -23,7 +23,7 @@ import { FuelPriceTable } from "@/components/FuelPriceTable";
 import { DownloadDataButtons } from "@/components/DownloadDataButtons";
 import { PriceHistoryChart } from "@/components/PriceHistoryChart";
 import { MercurialeMark } from "@/components/MercurialeMark";
-import { ProvenanceStamp } from "@/components/ProvenanceStamp";
+import { SourceNote } from "@/components/SourceNote";
 import { HeroBackdrop } from "@/components/HeroBackdrop";
 import { TickerBand, type TickerStat } from "@/components/TickerBand";
 import Link from "next/link";
@@ -532,7 +532,7 @@ export default async function Home() {
                 </li>
               ))}
             </ul>
-            <SourceNote>
+            <SourceNote sources={["eu-commission"]}>
               Fonte: Bollettino Petrolifero Settimanale, Commissione Europea ·
               confronto tra le due rilevazioni settimanali più recenti
             </SourceNote>
@@ -598,7 +598,7 @@ export default async function Home() {
                 );
               })}
             </div>
-            <SourceNote>
+            <SourceNote sources={["alpha-vantage", "eu-commission", "eia"]}>
               Fonte: come le rispettive sezioni (Alpha Vantage per le materie
               prime, Commissione Europea ed EIA per i carburanti) · variazione
               calcolata sui soli dati disponibili nella finestra, non
@@ -645,7 +645,7 @@ export default async function Home() {
                 }}
               />
             </div>
-            <SourceNote>
+            <SourceNote sources={["eu-commission"]}>
               Fonte: Bollettino Petrolifero Settimanale, Commissione Europea ·
               Aggiornamento: ogni giovedì · Confini amministrativi: Natural
               Earth (dominio pubblico)
@@ -747,7 +747,7 @@ export default async function Home() {
               series={commoditySeries}
             />
           </div>
-          <SourceNote>
+          <SourceNote sources={["alpha-vantage"]}>
             Fonte: Alpha Vantage (dati di mercato) · Aggiornamento: giornaliero
             (petrolio, gas naturale) · mensile (metalli, agricole) · il badge
             &quot;non aggiornato&quot; segnala una serie ferma oltre il ritardo
@@ -790,7 +790,7 @@ export default async function Home() {
               series={fuelSeries}
             />
           </div>
-          <SourceNote>
+          <SourceNote sources={["eu-commission", "eia"]}>
             Fonte: Bollettino Petrolifero Settimanale (UE, ogni giovedì) ·
             EIA (USA, ogni lunedì) · Prezzi medi nazionali, non punti vendita
             specifici
@@ -896,32 +896,6 @@ export default async function Home() {
         </div>
       </footer>
     </div>
-  );
-}
-
-function SourceNote({ children }: { children: React.ReactNode }) {
-  // Il CONTENUTO della nota resta identico (è il principio cardine del
-  // progetto: ogni dato con la sua fonte). Cambia solo lo stile: monospace
-  // maiuscolo spaziato, in tinta con l'estetica system-style. `uppercase`
-  // è puramente presentazionale, il testo nel DOM non cambia.
-  //
-  // Il timbro di provenienza qui davanti: le 3 note "Fonte:" sono i punti
-  // dove il principio del progetto si concretizza, quindi è dove la firma
-  // ha più senso. `items-start` + `mt-0.5` per allinearlo alla prima riga
-  // di testo anche quando la nota va a capo.
-  //
-  // Qui NON va il marchio (MercurialeMark), che pure ha preso il posto del
-  // timbro in header e footer. Due ragioni. La prima è di significato: in
-  // header e footer il segno dice "questo sito è Mercuriale", qui dice
-  // "questo numero ha una fonte" — sono due messaggi diversi e un segno solo
-  // per entrambi li confonde. La seconda è di leggibilità: a 14 px i tratti
-  // sottili del marchio collassano, mentre il timbro è disegnato con un
-  // cerchio pieno e una spunta spessa e regge la miniatura.
-  return (
-    <p className="mt-2 flex items-start gap-1.5 font-mono text-xs uppercase tracking-wider text-system-ink-muted">
-      <ProvenanceStamp size={14} className="mt-0.5 shrink-0 text-system-accent" />
-      <span>{children}</span>
-    </p>
   );
 }
 
