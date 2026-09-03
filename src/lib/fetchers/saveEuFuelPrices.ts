@@ -1,6 +1,6 @@
 import { db } from "@/lib/db/client";
 import { regions, retailFuelPrices } from "@/lib/db/schema";
-import type { EuFuelPricePoint } from "./euOilBulletin";
+import type { EuFuelHistoryPoint } from "./euOilBulletinHistory";
 
 /**
  * Come savePricePoints.ts ma per il dominio "regioni/carburanti al
@@ -8,7 +8,7 @@ import type { EuFuelPricePoint } from "./euOilBulletin";
  * upsert dell'anagrafica (qui `regions`), poi insert dello storico.
  */
 export async function saveEuFuelPrices(
-  points: EuFuelPricePoint[],
+  points: EuFuelHistoryPoint[],
   source: string
 ) {
   // Un solo timestamp di acquisizione per l'intero run (vedi
@@ -46,6 +46,9 @@ export async function saveEuFuelPrices(
         regionId,
         fuelType: point.fuelType,
         price: point.pricePerLiter.toString(),
+        // `?? null` e non `?.toString()`: un netto assente deve restare NULL
+        // in colonna, non diventare la stringa "undefined".
+        priceNet: point.priceNetPerLiter?.toString() ?? null,
         currency: point.currency,
         unit: "liter",
         recordedAt: new Date(point.date),
@@ -60,6 +63,7 @@ export async function saveEuFuelPrices(
         ],
         set: {
           price: point.pricePerLiter.toString(),
+          priceNet: point.priceNetPerLiter?.toString() ?? null,
           currency: point.currency,
           retrievedAt,
           source,

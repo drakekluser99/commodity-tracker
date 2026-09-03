@@ -23,6 +23,11 @@ export interface RetailFuelBulkPoint {
   continent: string;
   fuelType: "petrol" | "diesel";
   pricePerLiter: number;
+  /**
+   * Prezzo al netto delle imposte, quando la fonte lo pubblica. Assente
+   * per l'EIA, che dà solo il prezzo alla pompa.
+   */
+  priceNetPerLiter?: number | null;
   currency: string;
   date: string; // YYYY-MM-DD
 }
@@ -76,6 +81,7 @@ export async function saveRetailFuelPricesBulk(
     regionId: number;
     fuelType: string;
     price: string;
+    priceNet: string | null;
     currency: string;
     unit: string;
     recordedAt: Date;
@@ -93,6 +99,7 @@ export async function saveRetailFuelPricesBulk(
       regionId,
       fuelType: point.fuelType,
       price: point.pricePerLiter.toString(),
+      priceNet: point.priceNetPerLiter?.toString() ?? null,
       currency: point.currency,
       unit: "liter",
       recordedAt: new Date(point.date),
@@ -119,6 +126,10 @@ export async function saveRetailFuelPricesBulk(
         // tutti sullo stesso numero.
         set: {
           price: sql`excluded.price`,
+          // Anche il netto va letto da `excluded`: è l'unico modo perché
+          // ogni riga del blocco conservi il PROPRIO valore invece che
+          // quello dell'ultima riga vista.
+          priceNet: sql`excluded.price_net`,
           currency: sql`excluded.currency`,
           retrievedAt,
           source,

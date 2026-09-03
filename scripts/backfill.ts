@@ -47,13 +47,15 @@ async function main() {
     await backfillCommodities({ fromDate, dryRun, only });
   } else if (target === "us-fuel") {
     await backfillUsFuel({ fromDate, dryRun });
+  } else if (target === "eu-fuel") {
+    await backfillEuFuel({ fromDate, dryRun });
   } else {
     console.error(USAGE);
     process.exit(1);
   }
 }
 
-const USAGE = `Uso: npx tsx scripts/backfill.ts <commodities|us-fuel> [opzioni]
+const USAGE = `Uso: npx tsx scripts/backfill.ts <commodities|us-fuel|eu-fuel> [opzioni]
 
   --from AAAA-MM-GG   data di partenza dello storico (default: 10 anni fa)
   --only SIMBOLI      solo queste materie prime, separate da virgola
@@ -238,6 +240,67 @@ function selectCommodities<T extends { readonly symbol: string }>(
   // canonico di TRACKED_COMMODITIES e un simbolo ripetuto per errore
   // sulla riga di comando non produce due richieste.
   return all.filter((c) => wanted.includes(c.symbol));
+}
+
+/**
+ * Carburanti al consumo UE dal file storico della Commissione.
+ *
+ * Un solo download da 4,3 MB copre tutto: 27 paesi, due carburanti, tutte
+ * le settimane dal 2005, con il prezzo alla pompa E quello al netto delle
+ * imposte. La differenza fra i due è il carico fiscale — il dato che il
+ * sito non poteva calcolare prima di questo file.
+ *
+ * Il default a 10 anni vale anche qui: sono già ~28.000 righe (52
+ * settimane × 10 anni × 27 paesi × 2 carburanti). Andare al 2005 ne
+ * triplicherebbe il numero per finestre che nessuna schermata mostra.
+ */
+async function backfillEuFuel(opts: { fromDate?: string; dryRun: boolean }) {
+  const { fetchEuFuelHistory } = await import(
+    "../src/lib/fetchers/euOilBulletinHistory"
+  );
+
+  const fromDate = opts.fromDate ?? tenYearsAgo();
+  console.log(`Backfill carburanti UE da ${fromDate}`);
+  console.log("  scaricamento del file storico (~4,3 MB)...");
+
+  const points = await fetchEuFuelHistory({ fromDate });
+  const dates = [...new Set(points.map((p) => p.date))].sort();
+  const conNetto = points.filter((p) => p.priceNetPerLiter !== null).length;
+
+  console.log(
+    `  ${points.length} rilevazioni  ${dates[0]} → ${dates[dates.length - 1]}  (${dates.length} settimane)`
+  );
+  console.log(
+    `  con prezzo netto: ${conNetto} su ${points.length} — le altre non avranno scomposizione fiscale`
+  );
+
+  if (opts.dryRun) {
+    console.log("--dry-run: niente è stato scritto.");
+    return;
+  }
+
+  const { saveRetailFuelPricesBulk } = await import(
+    "../src/lib/fetchers/saveRetailFuelBulk"
+  );
+  const written = await saveRetailFuelPricesBulk(
+    points.map((p) => ({
+      regionName: p.countryName,
+      // Il codice ISO non lo scriviamo: `regions.country_code` è già
+      // popolato (o già null) dal fetcher settimanale, e sovrascriverlo da
+      // qui significherebbe che due fetcher si contendono la stessa
+      // colonna. Una cosa per volta.
+      countryCode: null,
+      continent: "europe",
+      fuelType: p.fuelType,
+      pricePerLiter: p.pricePerLiter,
+      priceNetPerLiter: p.priceNetPerLiter,
+      currency: p.currency,
+      date: p.date,
+    })),
+    "eu_weekly_oil_bulletin",
+    (w, t) => process.stdout.write(`\r  scrittura ${w}/${t}`)
+  );
+  console.log(`\nScritte ${written} righe in retail_fuel_prices.`);
 }
 
 function tenYearsAgo(): string {
