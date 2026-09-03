@@ -5,6 +5,7 @@ import {
 } from "./alphaVantage";
 import { savePricePoints } from "./savePricePoints";
 import { startFetchRun, finishFetchRun, errorMessage } from "./fetchRunLog";
+import { isAuthorizedCronRequest } from "../cronAuth";
 
 type Commodity = (typeof TRACKED_COMMODITIES)[number];
 
@@ -20,8 +21,7 @@ export async function runMarketPriceCron(
   batch: readonly Commodity[],
   batchLabel: string
 ) {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isAuthorizedCronRequest(request)) {
     // Richiesta non autenticata: non è un tentativo di fetch, non lo
     // registriamo in fetch_runs.
     return NextResponse.json({ error: "Non autorizzato" }, { status: 401 });

@@ -15,6 +15,9 @@ const VIEW_H = 260;
 // riquadro, altrimenti nei punti estremi il tratto verrebbe tagliato a
 // metà dallo spessore della linea.
 const PAD_Y = 26;
+// Rilevazioni minime perché il disegno abbia senso: vedi la guardia
+// dentro il componente.
+const MIN_POINTS = 8;
 
 /**
  * Sfondo dell'header: la curva REALE della serie passata (il Brent a 90
@@ -40,10 +43,17 @@ const PAD_Y = 26;
  * gira una volta sola sul server e in pagina arriva solo il tracciato.
  */
 export function HeroBackdrop({ points, className = "" }: HeroBackdropProps) {
-  // Con meno di 2 punti non esiste una curva da disegnare (una linea ha
-  // bisogno di almeno due estremi). Meglio nessuno sfondo che un tratto
-  // orizzontale finto che sembrerebbe "prezzo piatto".
-  if (points.length < 2) return null;
+  // Sotto questa soglia non disegniamo nulla. La ragione non è tecnica ma
+  // di onestà del segno: con 2 o 3 rilevazioni la "curva" viene una retta
+  // diagonale che attraversa tutto l'header, e una retta suggerisce un
+  // andamento regolare che i dati non dimostrano affatto — è esattamente
+  // il contrario di quello che questo progetto vuole comunicare.
+  // Succede davvero: se il cron di Alpha Vantage salta qualche giorno, la
+  // finestra di 90 giorni può contenere pochissimi punti (verificato in
+  // produzione il 3 set 2026, dove il Brent aveva solo 2 rilevazioni e
+  // l'header mostrava una diagonale netta). Meglio nessuno sfondo che uno
+  // sfondo che mente.
+  if (points.length < MIN_POINTS) return null;
 
   const values = points.map((p) => p.value);
   const min = Math.min(...values);

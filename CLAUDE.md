@@ -104,8 +104,15 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
     l'esito di ogni run in `fetch_runs`. Regola: il logging NON fa mai
     fallire il fetch (try/catch interno; `startFetchRun` torna `null` se
     il DB è giù, `finishFetchRun` no-op su `null`)
+- `src/lib/cronAuth.ts` — `isAuthorizedCronRequest(request)`, l'unico
+  punto in cui si verifica `CRON_SECRET` (3 set 2026). Prima il confronto
+  era in linea in ogni route: **nega l'accesso se il segreto manca**
+  (prima `Bearer ${undefined}` diventava la stringa "Bearer undefined" e
+  chiunque la inviasse passava — vedi "Errori noti") e confronta gli
+  SHA-256 con `timingSafeEqual`. Non reintrodurre il confronto in linea
 - `src/app/api/cron/*/route.ts` — 7 route protette da `CRON_SECRET`
-  (header `Authorization: Bearer`), schedulate in `vercel.json`:
+  (header `Authorization: Bearer`, via `isAuthorizedCronRequest`),
+  schedulate in `vercel.json`:
   `fetch-market-prices-1`…`-5` (materie prime, ogni batch a un'ora
   diversa: 06/08/10/12/14 UTC — su Hobby i cron hanno precisione
   oraria ±59min, quindi vanno distanziati di ore non di minuti),
@@ -427,6 +434,15 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   a 3 stati (`src/lib/freshness/`); i carburanti no. Se cambi la cadenza
   di una fonte, aggiorna anche `FRESHNESS_CONFIG` in
   `src/lib/freshness/config.ts`
+- **Bypass di `CRON_SECRET` con il segreto mancante (corretto 3 set
+  2026).** Il controllo era `authHeader !== \`Bearer ${process.env.CRON_SECRET}\``.
+  In JavaScript `undefined` interpolato in un template literal diventa la
+  STRINGA "undefined": senza la variabile d'ambiente (deploy di preview,
+  variabile cancellata) il segreto atteso diventava letteralmente
+  `Bearer undefined` e chiunque poteva far scattare i cron, bruciando il
+  rate limit giornaliero di Alpha Vantage. Regola generale: un controllo
+  di sicurezza che non può funzionare deve NEGARE, non aprire. Ora tutto
+  passa da `src/lib/cronAuth.ts`
 - **`regions.name` senza vincolo `UNIQUE` (corretto in migrazione `0005`,
   1 set 2026).** Prima, `saveEuFuelPrices.ts`/`saveUsFuelPrices.ts`
   chiamavano `insert(regions).onConflictDoNothing()` senza un vincolo su
@@ -524,6 +540,24 @@ ponderata, import massivo storico, estrapolazioni causali.
 - Il grafico storico prezzi esiste già (`PriceHistoryChart`, finestre
   90gg materie prime / 30gg carburanti). Manca semmai una finestra più
   lunga ora che `price_history` accumula più mesi
+- **Audit sicurezza (3 set 2026)**: fatto. Trovato e corretto il bypass
+  di `CRON_SECRET` sopra; aggiunti header di sicurezza in
+  `next.config.ts` (`X-Frame-Options: DENY`, `nosniff`,
+  `Referrer-Policy`, `Permissions-Policy`) — **attenzione**: se un giorno
+  si fa il widget incorporabile del brief, `X-Frame-Options: DENY` va
+  allentato in modo mirato sulla sola rotta del widget, non tolto.
+  Nessuna CSP di proposito (va introdotta in `Report-Only` prima: i font
+  di next/font e gli stili inline di recharts/react-simple-maps la
+  romperebbero in silenzio). Verificato pulito: nessun
+  `dangerouslySetInnerHTML`/`eval`, nessuna query SQL costruita a
+  stringa, nessun segreto nel repo, `.env*` non tracciati. Le 6
+  vulnerabilità `npm audit` restano: `esbuild` via `drizzle-kit` è
+  dev-only, `uuid` via `exceljs` non è raggiungibile dal nostro uso
+  (parsing in sola lettura di un file da fonte fissa) — entrambe
+  fixabili solo con downgrade breaking
+- **Audit ortografico (3 set 2026)**: fatto su tutto il testo visibile
+  (homepage, metodologia, glossario, componenti, metadata, README,
+  CONTRIBUTING). Nessun errore trovato
 - **Prossimo checkpoint (giovedì 3 set 2026)**: verificare in `fetch_runs`
   il primo run automatico del cron `fetch-eu-fuel-prices` dopo le
   modifiche di oggi (wordmark + fascia sintetica, commit `270b23c` e
