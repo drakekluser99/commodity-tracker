@@ -585,13 +585,29 @@ ponderata, import massivo storico, estrapolazioni causali.
     MANUALE (lo conferma la run USA 15 secondi dopo, 08:43:56). Il primo
     giovedì utile da quando `fetch_runs` esiste era proprio il 3 set:
     verifica ancora da fare dopo le 12:00 UTC
-  - **Carburanti USA: guasto reale, `EIA_API_KEY` non configurata su
-    Vercel.** La route fallisce prima di chiamare l'EIA e scrive
-    `ok: false` + `errorText: "EIA_API_KEY non configurata"` in
-    `fetch_runs`. È il "nessun fallimento silenzioso" del progetto che
-    ripaga: l'errore si legge e dice cosa fare. Va aggiunta la variabile
-    in Settings → Environment Variables (almeno Production); le env var
-    si leggono a runtime, quindi non serve ridispiegare
+  - **Domanda ancora aperta dopo questa diagnosi**: i due cron
+    carburanti scattano davvero da soli su Vercel? In `fetch_runs` non
+    c'è ancora nessuna loro esecuzione automatica — solo le due manuali
+    del 1 set. Le risposte arrivano da sole: UE giovedì dopo le 12:00
+    UTC, USA lunedì dopo le 18:00 UTC. Fino ad allora la domanda resta
+    senza risposta, e NON va data per risolta
+  - **Carburanti USA: nessun guasto in produzione.** La run in tabella
+    riporta `ok: false` + `errorText: "EIA_API_KEY non configurata"`, ma
+    su Vercel quella variabile ESISTE dal 27 ago in tutti e tre gli
+    ambienti (Production, Preview, Development) — verificato a schermo.
+    La conclusione corretta è che quella run **non girava su Vercel**:
+    era la chiamata manuale delle 08:43 fatta in LOCALE, dove
+    `.env.local` non ha `EIA_API_KEY`. Lo conferma la run UE 15 secondi
+    prima, riuscita con 54 punti: il fetcher UE scarica un XLSX pubblico
+    e non ha bisogno di chiavi, quindi in locale funziona lo stesso.
+    **Lezione da non ripetere**: una riga di `fetch_runs` non dice DOVE
+    ha girato il codice. Prima di dedurre un guasto in produzione da un
+    errore di configurazione, va confrontato con le variabili
+    effettivamente presenti su Vercel. Da sistemare comunque, ma è una
+    scomodità locale e non un problema del sito: aggiungere
+    `EIA_API_KEY` a `.env.local` sulla macchina di sviluppo, altrimenti
+    ogni chiamata manuale al cron USA continuerà a fallire e a sporcare
+    `fetch_runs` con errori fuorvianti
 - **Colonna `latest_recorded_at` in `fetch_runs` — da fare.** Nasce dalla
   diagnosi sopra: siccome `points_saved` non distingue "dato nuovo" da
   "stesso dato riscritto", per capire se una fonte è ferma servono due
