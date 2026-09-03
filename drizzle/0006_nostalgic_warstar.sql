@@ -1,0 +1,1 @@
+ALTER TABLE "retail_fuel_prices" ADD COLUMN "price_net" numeric(10, 4);
