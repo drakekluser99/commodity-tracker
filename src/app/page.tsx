@@ -3,6 +3,7 @@ import {
   getLatestFuelPrices,
   getCommodityPriceHistory,
   getFuelPriceHistory,
+  getLatestWeeklyNarratives,
 } from "@/lib/db/queries";
 import { groupCommodityHistory, groupFuelHistory, priceMovers } from "@/lib/priceHistory";
 import { displayCommodityPrice } from "@/lib/commodityDisplay";
@@ -132,12 +133,13 @@ export default async function Home() {
   const commodityHistorySince = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
   // eslint-disable-next-line react-hooks/purity
   const fuelHistorySince = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-  const [commodityPrices, fuelPrices, commodityHistory, fuelHistory] =
+  const [commodityPrices, fuelPrices, commodityHistory, fuelHistory, weeklyNarrative] =
     await Promise.all([
       getLatestCommodityPrices(),
       getLatestFuelPrices(),
       getCommodityPriceHistory(commodityHistorySince),
       getFuelPriceHistory(fuelHistorySince),
+      getLatestWeeklyNarratives(),
     ]);
   const commoditySeries = groupCommodityHistory(commodityHistory);
 
@@ -498,6 +500,45 @@ export default async function Home() {
       </header>
 
       <main className="mx-auto max-w-7xl px-6 py-10">
+        {/* "Cosa è cambiato questa settimana": non un elenco di
+            percentuali (quello è "Maggiori variazioni" subito sotto), ma
+            frasi che dicono quanta parte di una variazione è carburante e
+            quanta è tassa — la stessa domanda a cui risponde la
+            scomposizione fiscale, applicata al movimento invece che al
+            valore assoluto. Generata una volta a settimana dal cron UE
+            (vedi generateWeeklyNarrative.ts) e ARCHIVIATA: qui mostriamo
+            solo l'ultima, non è ricalcolata a ogni visita. Senza numero di
+            sezione, come "Maggiori variazioni": è una sintesi, non una
+            quinta voce dell'indice 01–04. */}
+        {weeklyNarrative.length > 0 && (
+          <section className="mb-12">
+            <div className="flex items-baseline gap-3">
+              <span className="font-mono text-xs text-system-ink-muted">✎</span>
+              <h2 className="text-lg font-semibold text-system-ink">
+                Cosa è cambiato questa settimana
+              </h2>
+            </div>
+            <p className="mt-1 text-sm text-system-ink-secondary">
+              Settimana del {formatDate(weeklyNarrative[0].weekOf)}, rispetto
+              alla precedente.
+            </p>
+            <ul className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {weeklyNarrative.map((n) => (
+                <li
+                  key={n.kind}
+                  className="rounded-lg border border-system-border bg-system-surface p-4 text-sm leading-relaxed text-system-ink"
+                >
+                  {n.text}
+                </li>
+              ))}
+            </ul>
+            <SourceNote>
+              Fonte: Bollettino Petrolifero Settimanale, Commissione Europea ·
+              confronto tra le due rilevazioni settimanali più recenti
+            </SourceNote>
+          </section>
+        )}
+
         {/* "Maggiori variazioni": riepilogo in cima, senza numero di
             sezione — è una sintesi dei dati che seguono, non una quinta
             sezione dell'indice 01–04. */}

@@ -167,3 +167,40 @@ export const fetchRuns = pgTable(
     ),
   })
 );
+
+/**
+ * WEEKLY_NARRATIVES
+ * Le 2-3 righe "cosa è cambiato questa settimana" mostrate in home,
+ * generate dal cron carburanti UE confrontando la settimana appena
+ * arrivata con quella precedente (vedi generateWeeklyNarrative.ts).
+ *
+ * ARCHIVIATE, non ricalcolate a ogni richiesta: sono una dichiarazione
+ * fatta in un momento preciso ("questa settimana il diesel è salito di
+ * 3 centesimi"), non una vista live sui dati attuali. Se un domani un
+ * valore storico venisse corretto, la narrazione di una settimana passata
+ * non deve cambiare sotto i piedi di chi l'ha già letta.
+ */
+export const weeklyNarratives = pgTable(
+  "weekly_narratives",
+  {
+    id: serial("id").primaryKey(),
+    // Data della rilevazione più recente confrontata — la settimana
+    // "nuova" del confronto, non il momento in cui la riga è stata
+    // generata (quello è `createdAt`).
+    weekOf: timestamp("week_of").notNull(),
+    // "it_petrol" | "it_diesel" | "eu_mover" — vedi NarrativeEntry in
+    // generateWeeklyNarrative.ts.
+    kind: varchar("kind", { length: 32 }).notNull(),
+    text: text("text").notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    // Bersaglio dell'upsert: se il cron rigira sulla stessa settimana
+    // (prima che ne arrivi una nuova) aggiorna la riga invece di duplicarla.
+    weekKindUnique: uniqueIndex("weekly_narratives_week_kind_unique").on(
+      table.weekOf,
+      table.kind
+    ),
+    weekOfIdx: index("weekly_narratives_week_of_idx").on(table.weekOf),
+  })
+);

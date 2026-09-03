@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchEuFuelHistory } from "@/lib/fetchers/euOilBulletinHistory";
 import { saveEuFuelPrices } from "@/lib/fetchers/saveEuFuelPrices";
+import { saveWeeklyNarrative } from "@/lib/fetchers/saveWeeklyNarrative";
+import { getLastTwoEuropeFuelWeeks } from "@/lib/db/queries";
+import { generateWeeklyNarrative } from "@/lib/narrative/generateWeeklyNarrative";
 import {
   startFetchRun,
   finishFetchRun,
@@ -38,6 +41,27 @@ export async function GET(request: NextRequest) {
     // storico completo lo carica una tantum scripts/backfill.ts.
     const points = await fetchEuFuelHistory({ latestOnly: true });
     const saved = await saveEuFuelPrices(points, SOURCE);
+
+    // "Cosa è cambiato questa settimana": generata DOPO il salvataggio,
+    // confrontando le due settimane più recenti ora in tabella (quella
+    // appena arrivata e quella precedente). In un try/catch separato dal
+    // resto: i prezzi sono già salvati correttamente a questo punto, un
+    // errore qui è un arricchimento mancato, non un fallimento del cron —
+    // non deve far segnare `ok: false` in fetch_runs per un dato che in
+    // realtà è arrivato.
+    try {
+      const { current, previous, currentDate } =
+        await getLastTwoEuropeFuelWeeks();
+      if (current.length > 0 && previous.length > 0 && currentDate) {
+        const entries = generateWeeklyNarrative(current, previous);
+        await saveWeeklyNarrative(currentDate, entries);
+      }
+    } catch (err) {
+      console.error(
+        "Errore nella generazione di 'cosa è cambiato questa settimana':",
+        err
+      );
+    }
 
     await finishFetchRun(runId, { ok: true, pointsSaved: saved });
     return NextResponse.json({ ok: true, saved });

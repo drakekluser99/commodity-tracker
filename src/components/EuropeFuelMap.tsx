@@ -220,7 +220,6 @@ export default function EuropeFuelMap({ prices, euAverage }: Props) {
   const gradientId = useId();
 
   const activeMeasure = MEASURES.find((m) => m.key === measure) ?? MEASURES[0];
-  const activeFuel = FUELS.find((f) => f.key === fuel) ?? FUELS[0];
 
   /**
    * Il centro della scala divergente.
