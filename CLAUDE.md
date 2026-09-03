@@ -100,6 +100,17 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
     `saveUsFuelPrices.ts` inseriscono anche in `regions` con
     `onConflictDoNothing({ target: regions.name })` — target esplicito,
     vedi "Errori noti" sul vincolo `UNIQUE` mancante
+  - `savePricePointsBulk` (`savePricePoints.ts`) / `saveRetailFuelPricesBulk`
+    (`saveRetailFuelBulk.ts`) — scritture massive per `scripts/backfill.ts`,
+    ACCANTO alle funzioni del cron, non al posto loro. Il driver è `neon-http`:
+    ogni query è una richiesta HTTP, quindi due query per punto sono perfette
+    su 2 punti e inservibili su 10.000. Qui: una query per l'anagrafica, poi
+    `INSERT` a blocchi di 500 righe. La deduplica su `(commodity, data)` prima
+    di scrivere NON è opzionale: due righe uguali nello stesso statement fanno
+    fallire l'intero blocco con "ON CONFLICT DO UPDATE command cannot affect
+    row a second time". `excluded.price` nel `set` perché in un INSERT
+    multi-riga ogni riga ha un prezzo diverso: un valore costante li appiattirebbe
+    tutti sullo stesso numero
   - `fetchRunLog.ts` — `startFetchRun` / `finishFetchRun`: registrano
     l'esito di ogni run in `fetch_runs`. Regola: il logging NON fa mai
     fallire il fetch (try/catch interno; `startFetchRun` torna `null` se
@@ -267,6 +278,37 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   un dato che non corrisponde alla fonte ufficiale, senza scrivere
   codice. `package.json` ha ora anche `description`/`repository`/
   `homepage`/`license` (mancavano; `private: true` resta invariato)
+
+- `scripts/backfill.ts` (3 set 2026) — backfill dello storico prezzi:
+  `npx tsx scripts/backfill.ts <commodities|us-fuel> [--from AAAA-MM-GG]
+  [--only SIMBOLI] [--dry-run]`. NON costa richieste aggiuntive ad Alpha
+  Vantage: ogni risposta conteneva GIÀ l'intera serie in `json.data` e il
+  cron ne usava solo `data[0]`, scartando il resto — `fetchOne` è ora un
+  involucro di `fetchCommoditySeries`, unica implementazione del parsing
+  per cron e backfill. `intervalForCategory` dichiara che gli endpoint
+  energia accettano `daily` e metalli/agricole solo `monthly`: non è una
+  preferenza nostra, è un limite della fonte (per questo il rame si muove
+  una volta al mese). Default a 10 anni — senza limite il WTI giornaliero
+  risale al 1986 e scriverebbe decine di migliaia di righe che nessuna
+  schermata mostra. Idempotente (stesse chiavi uniche del cron): si
+  rilancia senza duplicare e riprende dopo un'interruzione.
+  **Esito del primo lancio reale (3 set 2026)**: `commodities` 8013/8367
+  righe — cotone, zucchero e caffè fuori per quota Alpha Vantage esaurita
+  (~25 richieste/giorno, consumate anche dai batch del cron chiamati a
+  mano nella stessa giornata); `us-fuel` 1044/1044 senza intoppi (quota
+  EIA separata). `--only COTTON,SUGAR,COFFEE` esiste per riprendere i
+  mancanti senza rilanciare tutti e dieci i simboli: su 25 richieste al
+  giorno, sette sprecate per riscrivere righe identiche sono la
+  differenza tra recuperarli oggi e rimandare. `selectCommodities`
+  fallisce forte su un simbolo sconosciuto invece di filtrare a vuoto —
+  stesso principio di `getFreshnessConfig`, mai un default silenzioso
+- `scripts/inspect-eu-history.ts` (3 set 2026) — ispeziona il file
+  STORICO del bollettino UE ("Price developments 2005 onwards", ~4,3 MB),
+  diverso da quello settimanale usato in `euOilBulletin.ts`. Contiene i
+  prezzi al netto delle imposte, l'IVA e le accise: **lo stesso download**
+  serve sia il backfill europeo sia la scomposizione del prezzo alla
+  pompa (vedi "Cosa manca"). Solo ispezione — il parser va scritto su un
+  layout osservato, non ancora fatto
 
 ## Convenzioni di stile del codice
 
@@ -466,6 +508,37 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   `regions.name` ha `.unique()` in `schema.ts` e i due fetcher passano
   `onConflictDoNothing({ target: regions.name })` esplicito
 
+- **`.env.local` scritto con la codifica sbagliata** (3 set 2026). Un file
+  creato con la redirezione di PowerShell (`"CHIAVE=x" > .env.local`) su
+  Windows PowerShell 5.1 viene salvato in **UTF-16LE**, non UTF-8: `dotenv`
+  non riconosce nessuna riga e `tsx` stampa `injected env (0)` senza alcun
+  errore. Stesso effetto con un BOM davanti (`Set-Content -Encoding utf8`
+  su PS 5.1 lo aggiunge). Scriverlo con
+  `[System.IO.File]::WriteAllLines("$PWD\.env.local", $lines)`, che usa
+  UTF-8 senza BOM. Verifica senza esporre i valori: il primo byte di
+  `[System.IO.File]::ReadAllBytes(".env.local")` dev'essere la lettera
+  iniziale della prima chiave (`0x44` per `DATABASE_URL`); `0xEF` è un BOM,
+  `0xFF` è UTF-16
+- **Le variabili `Secret` su Vercel sono write-only** (3 set 2026): una
+  volta salvate non si rileggono e non si possono riconvertire in `Config`.
+  Se il valore serve altrove va rigenerato dalla fonte. `vercel env pull`
+  NON è la scorciatoia: collega la cartella a un progetto Vercel, e se
+  l'account attivo è quello aziendale invece del personale si finisce con
+  un `.vercel/project.json` che punta all'organizzazione sbagliata. Per tre
+  variabili conviene copiarle a mano; per sistemare lo scope:
+  `npx vercel whoami` / `teams ls` / `switch`
+- **Due cloni locali diversi sul PC** (3 set 2026).
+  `C:\Users\ammin\progetti\commodity-tracker` è il clone di lavoro vero.
+  Esiste anche `C:\Users\ammin\Documents\commodity-tracker`, stesso
+  remote ma fermo indietro nella cronologia: usarlo per errore è costato
+  mezza sessione (il sito in locale non mostrava il restyling perché si
+  lavorava, senza saperlo, nella cartella sbagliata). I due hanno anche
+  `.env.local` DIVERSI. Prima di dare per scontato "a che punto siamo",
+  controlla sempre il percorso e `git log --oneline -5`; prima di
+  aggiungere una variabile d'ambiente, verifica con `Select-String` se
+  esiste già — una riga duplicata produce 401 che sembrano casuali su
+  chiamate identiche
+
 ## Workflow con l'utente
 
 - L'utente alterna claude.ai (chat web, dove Claude prepara modifiche in
@@ -479,6 +552,16 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   push (vedi errore noto sopra).
 - Dopo il push, Vercel ridispiega automaticamente — non serve azione
   manuale su Vercel.
+- Claude su claude.ai lavora su un clone nel cloud e produce **patch git**
+  (`mercuriale-NN.patch`), che l'utente applica con `git am` e pusha dal
+  proprio PC: il container non ha credenziali per il repository e non può
+  pushare. Verifiche obbligatorie fra `git am` e `git push`:
+  `npx tsc --noEmit` e `npx eslint`.
+- `git push` aggiorna SOLO il branch, e Vercel ne fa una **Preview**. La
+  produzione cambia solo quando la pull request viene fusa in `main`
+  (3 set 2026: mezz'ora persa a guardare l'URL di produzione aspettando
+  modifiche che erano ferme sul branch). Tre livelli distinti: `commit` →
+  `localhost:3000`, `push` → URL Preview, merge in `main` → produzione.
 
 ## Cosa manca / prossimi passi naturali
 
@@ -545,9 +628,17 @@ ponderata, import massivo storico, estrapolazioni causali.
 - **MIMIT** (prezzi distributori italiani): dataset enorme, richiede un
   modello di regione GERARCHICO (oggi `regions` è piatto) + retention +
   tabelle dedicate. Progetto separato con la sua fase di design
-- Il grafico storico prezzi esiste già (`PriceHistoryChart`, finestre
-  90gg materie prime / 30gg carburanti). Manca semmai una finestra più
-  lunga ora che `price_history` accumula più mesi
+- **Storico: sbloccato** (3 set 2026). Prima c'erano 2 rilevazioni per
+  serie — le variazioni si calcolavano su due punti e `HeroBackdrop` si
+  rifiutava di disegnare (soglia: 8 rilevazioni). Ora `price_history` ha
+  ~8.000 righe su 10 anni. Manca solo completare cotone, zucchero e caffè
+  con `--only` (quota Alpha Vantage esaurita al primo lancio). Prossimo
+  passo naturale ora che i dati ci sono: una finestra più lunga dei 90/30
+  giorni attuali in `PriceHistoryChart`
+- **`EIA_API_KEY` su Vercel in `Production` — scadenza lunedì 18:00 UTC.**
+  È l'unico guasto vero rimasto in agenda: vedi la correzione della
+  correzione nella diagnosi sopra. In locale funziona già; su Production
+  la variabile risultava solo su `Preview` e non è stato riverificato
 - **Audit sicurezza (3 set 2026)**: fatto. Trovato e corretto il bypass
   di `CRON_SECRET` sopra; aggiunti header di sicurezza in
   `next.config.ts` (`X-Frame-Options: DENY`, `nosniff`,
@@ -585,14 +676,31 @@ ponderata, import massivo storico, estrapolazioni causali.
     MANUALE (lo conferma la run USA 15 secondi dopo, 08:43:56). Il primo
     giovedì utile da quando `fetch_runs` esiste era proprio il 3 set:
     verifica ancora da fare dopo le 12:00 UTC
-  - **Domanda ancora aperta dopo questa diagnosi**: i due cron
-    carburanti scattano davvero da soli su Vercel? In `fetch_runs` non
-    c'è ancora nessuna loro esecuzione automatica — solo le due manuali
-    del 1 set. Le risposte arrivano da sole: UE giovedì dopo le 12:00
-    UTC, USA lunedì dopo le 18:00 UTC. Da controllare in quella run:
-    `ok: true` e i valori benzina/diesel UE che si aggiornano di
-    conseguenza nella fascia sintetica. Fino ad allora la domanda resta
-    senza risposta, e NON va data per risolta
+  - **I cron su Vercel scattano da soli — RISPOSTA OTTENUTA per l'UE**
+    (3 set 2026, ~15:30 UTC, verificato in Drizzle Studio). La riga 17 di
+    `fetch_runs`: `eu_weekly_oil_bulletin` / `fetch-eu-fuel-prices`,
+    `started_at` 2026-09-03 12:17:36 → `finished_at` 12:17:38, `ok: true`,
+    **`points_saved: 54`** = 27 paesi × 2 carburanti, il numero esatto
+    atteso. Nessuno l'ha lanciata a mano. La conferma è più larga di una
+    riga sola: le run Alpha Vantage del 1, 2 e 3 settembre hanno tutte lo
+    stesso ritmo 06:2x / 08:1x / 10:3x / 12:2x / 14:2x — è lo scheduler
+    che funziona, non una coincidenza. Resta aperta SOLO la controparte
+    USA: risposta lunedì dopo le 18:00 UTC
+  - **Durata di una run non è un indicatore di salute, ma va guardata.**
+    Stessa giornata, stesso file, stesso risultato: la run automatica su
+    Vercel (12:17) è durata **1,7 s**, quella manuale dal PC dell'utente
+    (13:50) **20,2 s** — dodici volte tanto, entrambe con `points_saved:
+    54`. Era solo la rete (datacenter contro linea domestica). Ma 1,7 s
+    per scaricare e parsare un XLSX è al limite del plausibile: se
+    `points_saved` fosse stato basso, quella velocità sarebbe stata
+    l'indizio che il download aveva restituito qualcosa di più piccolo
+    del previsto. Si legge sempre insieme al conteggio, mai da sola
+  - **Il fallimento silenzioso, conservato.** Riga 1 di `fetch_runs`
+    (31 ago 19:19): `ok: TRUE` con **`points_saved: 0`**. Nessuna
+    eccezione, nessun errore, zero righe salvate — Alpha Vantage che
+    risponde HTTP 200 con un rate limit al posto dei dati. È esattamente
+    il caso per cui `fetch_runs` esiste, e ora se ne ha la prova in
+    tabella invece che a memoria
   - **Carburanti USA: nessun guasto in produzione.** La run in tabella
     riporta `ok: false` + `errorText: "EIA_API_KEY non configurata"`, ma
     su Vercel quella variabile ESISTE dal 27 ago in tutti e tre gli
@@ -605,11 +713,24 @@ ponderata, import massivo storico, estrapolazioni causali.
     **Lezione da non ripetere**: una riga di `fetch_runs` non dice DOVE
     ha girato il codice. Prima di dedurre un guasto in produzione da un
     errore di configurazione, va confrontato con le variabili
-    effettivamente presenti su Vercel. Da sistemare comunque, ma è una
-    scomodità locale e non un problema del sito: aggiungere
-    `EIA_API_KEY` a `.env.local` sulla macchina di sviluppo, altrimenti
-    ogni chiamata manuale al cron USA continuerà a fallire e a sporcare
-    `fetch_runs` con errori fuorvianti
+    effettivamente presenti su Vercel.
+    **CORREZIONE della correzione (3 set 2026, pomeriggio)**: la frase
+    "la variabile esiste su Vercel in tutti e tre gli ambienti,
+    verificato a schermo" era FALSA. Uno screenshot di Settings →
+    Environment Variables mostra `EIA_API_KEY` di tipo `Secret` presente
+    solo sotto **`Preview`**, non sotto `Production`. La conclusione che
+    non fosse un guasto in produzione resta corretta (quella run girava
+    in locale), ma la prova addotta non lo era.
+    Parte locale RISOLTA: `EIA_API_KEY` è ora in `.env.local` e la run
+    manuale delle 13:50:29 del 3 set riporta `ok: true`, `points_saved:
+    2`. **Ma funzionare in locale non dice nulla su Production** — è la
+    stessa identica trappola di sopra, al contrario. Da fare PRIMA di
+    lunedì 18:00 UTC: aggiungere `Production` agli Environments della
+    variabile su Vercel. Se il valore non è più disponibile (è `Secret`,
+    write-only) va rigenerato su eia.gov/opendata/register.php — arriva
+    per email, non a schermo — e riscritto NELLO STESSO MOMENTO in
+    `.env.local`, su Vercel (tutti gli ambienti) e in un gestore di
+    password, altrimenti fra due mesi si è di nuovo qui
 - **Colonna `latest_recorded_at` in `fetch_runs` — da fare.** Nasce dalla
   diagnosi sopra: siccome `points_saved` non distingue "dato nuovo" da
   "stesso dato riscritto", per capire se una fonte è ferma servono due
