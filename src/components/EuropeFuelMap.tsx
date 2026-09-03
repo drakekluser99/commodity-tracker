@@ -26,10 +26,10 @@ interface Props {
 // Hex reali dei token system-* (vedi globals.css @theme) — lo stile SVG di
 // react-simple-maps vuole un colore risolto, non può leggere var(--color-*)
 // in modo affidabile su tutti i browser per il fill.
-const NEUTRAL_HEX = "#e2e4e9"; // system-border — centro della scala (alla media UE)
-const ACCENT_HEX = "#0f6b66"; // system-accent (verde) — sotto la media
-const ACCENT_DOWN_HEX = "#b34324"; // system-accent-down (ruggine) — sopra la media
-const NO_DATA_FILL = "#eef0f3"; // system-border-subtle — fallback "nessun dato".
+const NEUTRAL_HEX = "#e4dccb"; // system-border — centro della scala (alla media UE)
+const ACCENT_HEX = "#3f6f4a"; // system-signal-down (verde bosco) — sotto la media
+const ACCENT_DOWN_HEX = "#b0461f"; // system-signal-up (ruggine) — sopra la media
+const NO_DATA_FILL = "#f0ebe0"; // system-border-subtle — fallback "nessun dato".
 // INVARIATO rispetto a prima: deliberatamente diverso da NEUTRAL_HEX
 // (system-border, il centro della scala), altrimenti "nessun dato" e
 // "esattamente alla media UE" sarebbero visivamente indistinguibili sulla
@@ -64,8 +64,8 @@ function interpolateColor(fromHex: string, toHex: string, t: number): string {
  *
  *   scarto = (prezzo_paese - media_UE) / (max - min)
  *
- * negativo = sotto media (più conveniente, verde `system-accent`),
- * positivo = sopra media (più caro, ruggine `system-accent-down`). Il
+ * negativo = sotto media (più conveniente, verde `system-signal-down`),
+ * positivo = sopra media (più caro, ruggine `system-signal-up`). Il
  * colore neutro (`system-border`) è il CENTRO della scala, non il minimo.
  * L'intensità del colore è `|scarto| * 2` clampata a 1, così un solo
  * outlier estremo non schiaccia la scala per tutti gli altri paesi (per

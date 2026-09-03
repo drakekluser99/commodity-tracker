@@ -152,7 +152,7 @@ export function FuelPriceTable({
             {continentLabel}
           </span>
           <DownloadDataButtons
-            filenameBase={`prezzario-carburanti-${continentLabel
+            filenameBase={`mercuriale-carburanti-${continentLabel
               .toLowerCase()
               .replace(/\s+/g, "-")}`}
             columns={FUEL_EXPORT_COLUMNS}
