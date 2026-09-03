@@ -271,8 +271,18 @@ export default async function Home() {
    * Quante fonti stanno pubblicando come previsto, sul totale di quelle
    * configurate. Non è una lettura di `fetch_runs` (quella dice se il
    * nostro cron è partito): dice se il DATO è arrivato, che è ciò che
-   * interessa a chi legge. Una fonte è "in linea" se almeno una delle sue
-   * serie è nello stato `aggiornato`.
+   * interessa a chi legge.
+   *
+   * Una fonte è "in linea" se almeno una delle sue serie NON è nello
+   * stato `non_aggiornato` — cioè se è `aggiornato` oppure `in_attesa`.
+   * La prima versione contava solo `aggiornato` ed era troppo severa:
+   * il Brent ha cadenza giornaliera con 3 giorni di tolleranza, quindi
+   * ogni lunedì mattina — mercati chiusi nel weekend — la fascia avrebbe
+   * annunciato "0 / 3 fonti in linea" su dati perfettamente normali
+   * (successo davvero il 3 set 2026). `in_attesa` significa "stiamo
+   * aspettando la prossima pubblicazione", che è il funzionamento
+   * previsto, non un guasto: il guasto è `non_aggiornato`, ed è quello
+   * che questo contatore deve segnalare.
    *
    * Espone in cima al sito il modello di freshness a 3 stati che finora
    * viveva solo come badge dentro la tabella delle materie prime.
@@ -280,7 +290,7 @@ export default async function Home() {
   const sourceStates = new Map<string, boolean>();
   for (const c of commodityRows) {
     const ok = sourceStates.get(c.source) ?? false;
-    sourceStates.set(c.source, ok || c.freshnessState === "aggiornato");
+    sourceStates.set(c.source, ok || c.freshnessState !== "non_aggiornato");
   }
   for (const [continent, fuels] of fuelsByContinent.entries()) {
     const source = CONTINENT_SOURCES[continent];
@@ -290,7 +300,7 @@ export default async function Home() {
     );
     const state = computeFreshness(mostRecent, getFreshnessConfig(source), now);
     const ok = sourceStates.get(source) ?? false;
-    sourceStates.set(source, ok || state === "aggiornato");
+    sourceStates.set(source, ok || state !== "non_aggiornato");
   }
   const sourcesOnline = Array.from(sourceStates.values()).filter(Boolean).length;
   const sourcesTotal = sourceStates.size;
@@ -356,7 +366,17 @@ export default async function Home() {
       key: "fonti",
       label: "Fonti in linea",
       value: sourcesTotal > 0 ? `${sourcesOnline} / ${sourcesTotal}` : "n/d",
-      note: "Carburanti: settimanale",
+      // La riga di contesto cambia significato quando c'è un problema:
+      // in condizioni normali porta la cadenza (informazione utile e
+      // sempre valida), quando una fonte è ferma oltre l'attesa lo dice
+      // esplicitamente invece di lasciare il rapporto "2 / 3" da
+      // interpretare da soli.
+      ...(sourcesTotal > 0 && sourcesOnline < sourcesTotal
+        ? {
+            note: `${sourcesTotal - sourcesOnline} ferma oltre l'attesa`,
+            noteTone: "up" as const,
+          }
+        : { note: "Carburanti: settimanale" }),
     },
   ];
 
