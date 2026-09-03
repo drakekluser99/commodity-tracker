@@ -586,7 +586,20 @@ export default async function Home() {
               <h2 className="text-lg font-semibold text-system-ink">Prezzo benzina in Europa</h2>
             </div>
             <div className="mt-4 rounded-lg border border-system-border bg-system-surface p-4">
-              <EuropeFuelMap prices={europeanFuelData} euAveragePetrol={europeAverage.petrol} />
+              {/* `euAverage` con entrambi i carburanti, non solo la benzina:
+                  la mappa ora si può commutare su diesel, e ogni metrica ha
+                  bisogno della PROPRIA media come centro della scala
+                  divergente. Passargli la media della benzina mentre disegna
+                  il diesel colorerebbe mezza Europa dalla parte sbagliata.
+                  Resta un oggetto di soli numeri — un Client Component non
+                  accetta funzioni come prop. */}
+              <EuropeFuelMap
+                prices={europeanFuelData}
+                euAverage={{
+                  petrol: europeAverage.petrol,
+                  diesel: europeAverage.diesel,
+                }}
+              />
             </div>
             <SourceNote>
               Fonte: Bollettino Petrolifero Settimanale, Commissione Europea ·
