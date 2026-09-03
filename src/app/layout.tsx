@@ -40,10 +40,16 @@ export const metadata: Metadata = {
     type: "website",
   },
   twitter: {
-    card: "summary",
+    // `summary_large_image` invece di `summary`: da questo commit esiste
+    // un'immagine OG 1200×630 (src/app/opengraph-image.tsx), e con la card
+    // piccola verrebbe ritagliata a un quadratino.
+    card: "summary_large_image",
     title: "Mercuriale",
     description: "Prezzi di materie prime e carburanti. Fonte, data e limiti inclusi.",
   },
+  // Icone: Next genera i <link> da solo dai file con nome convenzionale in
+  // src/app/ (icon.svg, apple-icon.svg, opengraph-image.tsx). Non serve
+  // dichiararli qui — anzi, dichiararli li duplicherebbe.
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
