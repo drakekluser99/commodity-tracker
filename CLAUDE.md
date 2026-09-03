@@ -36,7 +36,14 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   il bersaglio dell'upsert nei fetcher, evitano righe duplicate a ogni
   run del cron. Le colonne FK (`commodity_id`, `region_id`) sono
   `integer`, non `serial` (erano `serial`: sequence + `DEFAULT nextval()`
-  inutili su una FK — corretto in migrazione `0002`). `price_history` e
+  inutili su una FK — corretto in migrazione `0002`). `retail_fuel_prices` ha anche
+  `price_net` (3 set 2026): il prezzo AL NETTO delle imposte, dalla
+  Commissione — la differenza `price - price_net` è il carico fiscale.
+  Nullable e senza default: uno zero avrebbe fatto leggere ogni riga
+  precedente come "100% tasse", e dove la fonte non pubblica il netto il
+  carico fiscale NON si calcola, non si stima per differenza da una media.
+  Solo `eu_weekly_oil_bulletin` la valorizza, l'EIA dà il prezzo alla pompa
+  e basta. `price_history` e
   `retail_fuel_prices` hanno sia `recorded_at` (data DEL DATO) sia
   `retrieved_at` (quando il fetcher l'ha acquisito, nullable): due cose
   diverse, servono per distinguere "fonte ferma" da "fonte che non ha
@@ -88,9 +95,42 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
     connessioni simultanee, non solo sul conteggio). `fetchOne` logga
     con `console.error` le risposte anomale (campo `Information`/`Note`/
     `Error Message` al posto di `data`) invece di ingoiarle
-  - `euOilBulletin.ts` — scarica e parsa un file XLSX della Commissione
-    Europea (bollettino settimanale carburanti), parsing DIFENSIVO per
-    nome colonna (non posizione), validato contro dati reali
+  - `euOilBulletinHistory.ts` (3 set 2026) — **il fetcher UE in uso dal
+    cron del giovedì.** Scarica il file STORICO della Commissione ("Price
+    developments 2005 onwards", ~4,3 MB): tutte le settimane dal 2005 e un
+    secondo foglio coi prezzi AL NETTO delle imposte. Un file solo, un
+    parser solo, e la scomposizione fiscale che si aggiorna da sé ogni
+    settimana.
+    Il parsing è per **chiave esatta** e non per somiglianza: la riga 1 di
+    ogni foglio contiene chiavi macchina (`IT_price_with_tax_euro95`), così
+    se la Commissione riordina le colonne il parser regge, e se ne rinomina
+    una fallisce dicendo QUALE manca — non "12 colonne su 54", da cui non
+    si diagnostica niente.
+    Due fatti verificati sui dati veri e annotati nel file: i prezzi sono
+    già in EURO e non in valuta nazionale (la Danimarca a 2524 per 1000 l è
+    plausibile in euro; in corone sarebbe un decimo del reale), e la riga
+    più recente coincide con quanto il bollettino settimanale aveva già
+    salvato — il cambio di fonte non muove i numeri già in pagina.
+    Trappole del formato, tutte osservate: colonne `CTR` di separazione,
+    `XX_exchange_rate` intercalate SOLO per i 7 paesi fuori dall'euro,
+    colonne `UK_*` presenti nell'intestazione ma senza dati (le righe
+    recenti sono più corte dell'header — un parser posizionale ci
+    sbatterebbe), righe di disclaimer in coda scartate perché la colonna 1
+    non contiene una data, date in ordine DECRESCENTE.
+    Il cron chiede `latestOnly`: senza, ogni giovedì riscriverebbe ~56.000
+    righe per aggiornarne 54. `maxDuration` della rotta è passato da 10 a
+    **60 s** — il file pesa 4,3 MB ed ExcelJS lo apre per intero (7 fogli,
+    uno da 12.000 righe). Se la durata reale in `fetch_runs` si avvicina al
+    limite, la strada è leggere in streaming invece di caricare in memoria.
+    Verificato prima di spedirlo: 12 controlli contro una ricostruzione
+    fedele del layout, compresi i valori reali dell'Italia e lo scatto
+    della guardia quando una colonna sparisce
+  - `euOilBulletin.ts` — **NON più collegato al cron** (3 set 2026). Resta
+    perché lo usa `scripts/inspect-eu-bulletin.ts` ed è un parser validato
+    che vale come ripiego. Non ricollegarlo senza motivo: perderebbe il
+    prezzo netto, e con quello la scomposizione fiscale. Scarica e parsa il
+    file XLSX settimanale della Commissione, parsing DIFENSIVO per nome
+    colonna (non posizione), validato contro dati reali
   - `eiaUs.ts` — API REST EIA (governo USA), carburanti settimanali
   - `savePricePoints.ts` / `saveEuFuelPrices.ts` / `saveUsFuelPrices.ts`
     — persistenza. Usano `onConflictDoUpdate` sul vincolo unique: se la
@@ -184,7 +224,7 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
      sopra il contenuto in flusso normale — per questo `TickerBand` e la
      `<nav>` hanno `relative`. Toglierlo fa riapparire la curva sopra la
      fascia.
-  2. Wordmark "MERCURIALE" (`ProvenanceStamp` 38px + testo maiuscolo
+  2. Wordmark "MERCURIALE" (`MercurialeMark` 38px + testo maiuscolo
      spaziato, `text-[30px]` su mobile → `sm:text-4xl` → `lg:text-5xl`:
      la scala mobile è tarata a video, a `text-4xl` il wordmark andava
      sotto l'hamburger a 390px). Resta un `<p>`, non un heading — l'h1
@@ -225,6 +265,42 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   aggiornato" → rimanda a metodologia). Stesso pattern di
   `metodologia/page.tsx` (helper `Section`, header "torna alla dashboard").
   Stessa nota: prosa non aggiornata al modello a 3 stati
+- `src/components/MercurialeMark.tsx` (3 set 2026) — il marchio del
+  progetto: due assi con i terminali a T e una stella a quattro punte
+  nell'incrocio (un dato su un grafico). Componente React inline e non
+  `<img>`: eredita il colore dai token via `currentColor`, quindi UN file
+  serve sia l'ambra del chrome (`system-chrome-accent`) sia la ruggine
+  dell'avorio (`system-accent`). Ha sostituito `ProvenanceStamp` in header
+  (38px) e footer (28px). **`ProvenanceStamp` NON è stato rimosso** e resta
+  nelle note "Fonte:": il marchio dice "questo sito è Mercuriale", il
+  timbro dice "questo numero ha una fonte" — due messaggi diversi — e a
+  14px i tratti sottili del marchio collassano mentre il timbro regge.
+  L'SVG di partenza dell'utente era un bitmap ricalcato (39 path, 34 KB di
+  coordinate decimali, sfondo opaco): ridisegnato a mano in sei path.
+  L'estremità destra dell'asse del tempo è un disco pieno e non un
+  terminale a T — è "l'ultima rilevazione", come il punto finale della
+  curva di HeroBackdrop; nel disegno originale era un pallino rosso che
+  fluttuava slegato e leggeva come un badge di notifica.
+  **Nota**: la stella a lati concavi è il glifo diventato universale per
+  "contenuto generato da AI", che su un sito la cui promessa è la
+  verificabilità lavora contro. Sostituire le quattro `Q` con altrettante
+  `L` dà un rombo a lati diritti e chiude la questione — deciso di restare
+  fedeli al disegno originale, ma la manopola è lì.
+- `src/app/icon.svg` / `apple-icon.svg` / `opengraph-image.tsx` (3 set
+  2026) — convenzioni di nome dell'App Router: Next li trova da sé e
+  genera i `<link>` e i meta tag, quindi in `layout.tsx` NON vanno
+  dichiarate icone (sarebbe un doppione). La favicon non è il marchio
+  rimpicciolito ma un secondo disegno (tratti da 3 a 4 unità, assi
+  accorciati, disco tolto): a 16-32px i tratti sottili collassano —
+  verificato rasterizzando. `opengraph-image.tsx` usa `ImageResponse`, che
+  renderizza JSX con **Satori**, non con un browser: niente Tailwind (solo
+  stili inline), `display: flex` esplicito su ogni contenitore con più di
+  un figlio, e `currentColor` NON eredita nulla (non c'è albero CSS) — per
+  questo il marchio è ridisegnato inline in quel file e va aggiornato in
+  due posti se cambia. Il testo usa il font di sistema e non IBM Plex:
+  caricarlo sarebbe una fetch di rete in build per un'immagine che si
+  guarda a 200px in una timeline. `twitter.card` è passato a
+  `summary_large_image`.
 - `src/components/EuropeFuelMap.tsx` — mappa interattiva (react-simple-maps,
   atlante 50m — NON usare 110m, omette paesi piccoli come Malta/Lussemburgo).
   Inquadratura stretta sull'Europa con dati (`rotate: [-13,-50]`,
@@ -236,16 +312,59 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   media / ruggine (`system-signal-up`) sopra, centro neutro
   `system-border` (NON `system-panel`, troppo simile al fill "nessun
   dato" `#f0ebe0`). Box fissi "più economico/più caro" RIMOSSI (erano
-  sovrapposti alla cartografia); sostituiti da una riga sotto la mappa
-  `MINIMO | MEDIA UE | MASSIMO`. Il tooltip hover mostra comunque lo
-  scostamento testuale (`± millesimi vs media UE`) — il colore non è
-  l'unico veicolo dell'informazione. Header doc in testa al file (1 set
-  2026, audit design system) spiega la formula della scala divergente
+  sovrapposti alla cartografia).
+  **Restyling e vista fiscale (3 set 2026)**. Tre aggiunte, tutte perché il
+  colore da solo non si traduce in numeri senza passarci sopra il mouse:
+  (a) **barra-legenda continua** costruita con la STESSA `divergingColor`
+  dei paesi — una rampa ridisegnata a mano comincerebbe a mentire appena si
+  ritocca la formula. La tacca della media sta alla sua posizione
+  proporzionale REALE: sui dati del 31 ago cade al 55%, e disegnarla a metà
+  racconterebbe una simmetria che non c'è;
+  (b) **tre riquadri nominati** sotto la mappa — più economico, Italia, più
+  caro — ciascuno col quadratino di colore dalla stessa funzione, che è il
+  ponte per ritrovare quel paese sulla cartografia. L'Italia c'è SEMPRE,
+  anche quando non è un estremo. Stanno sotto e non sopra: i box
+  sovrapposti erano stati tolti apposta perché coprivano i paesi;
+  (c) **due selettori**: `FUELS` (benzina/diesel) × `MEASURES` (prezzo/quota
+  fiscale). Sono due DIMENSIONI, non quattro chip in fila — con quattro
+  voci il lettore deve ricostruire da sé che sono assi incrociati. `unit` e
+  `format` vivono in `MEASURES` perché sono ciò che distingue una misura
+  dall'altra (tre decimali e "€/L" contro uno e "%"). Una terza misura — la
+  sola accisa, dai fogli fiscali del file storico — sarebbe una voce in più
+  lì dentro: il registro è nato per questo e ha già pagato una volta.
+  Il centro della scala per la quota fiscale è la **quota della media**
+  `(media pompa − media netto) / media pompa`, NON la media delle quote dei
+  27: rispondono a domande diverse e sui dati veri differiscono di quasi
+  due punti. Lo scostamento cambia unità con la misura — millesimi per i
+  prezzi, punti percentuali per le quote.
+  `euAveragePetrol` è diventato `euAverage` con quattro numeri (lordo e
+  netto per entrambi i carburanti): ogni metrica ha bisogno della PROPRIA
+  media come centro, e usare quella della benzina mentre si disegna il
+  diesel colorerebbe mezza Europa dalla parte sbagliata. Resta un oggetto
+  di soli numeri — è un Client Component.
+  Corretto un difetto latente: con zero valori per la metrica attiva,
+  `Math.min(...[])` vale `Infinity` e finiva stampato come "Infinity €/L".
+  L'Italia ha un contorno ambra permanente, il paese in hover uno di
+  inchiostro più spesso: due segnali distinti che non si confondono. Il
+  tooltip mostra tutte e quattro le combinazioni con in evidenza quella
+  attiva — sono già in memoria, e si legge "2,017 €/L di cui il 51,4% è
+  tassa" senza cambiare vista.
+  Il titolo della sezione è "Prezzo dei **carburanti** in Europa": con la
+  mappa commutabile, "benzina" smentiva il grafico sotto. Statico e non
+  legato alla metrica attiva, altrimenti sarebbe l'unica sezione con
+  l'intestazione renderizzata lato client.
+  Header doc in testa al file spiega la formula della scala divergente
   direttamente nel codice, non solo qui
 - `src/components/FuelImpactCalculator.tsx` — calcolatore costo
   pieno/trasporti, EU vs USA, senza conversione EUR/USD (valute
   originali fianco a fianco). Header doc in testa al file (1 set 2026,
-  audit design system) — prima ne era privo
+  audit design system) — prima ne era privo.
+  **Due righe fiscali (3 set 2026)**: imposte sul pieno e quota fiscale del
+  prezzo. È la sottrazione della mappa portata sulla cifra che una persona
+  riconosce — "51,4%" è un'informazione, "di questi 100,84 € di pieno,
+  51,83 sono imposte" è la stessa informazione dopo che ti ha toccato. Per
+  gli USA mostrano "—": l'EIA non pubblica il netto, e il carico fiscale
+  americano NON si stima applicando la percentuale europea
 - `src/components/FuelPriceTable.tsx` — tabella carburanti con ricerca
   live e anteprima compressa (metà paesi più economici, metà più cari;
   ordinamento per prezzo medio benzina+diesel crescente). Header doc
@@ -302,6 +421,9 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   differenza tra recuperarli oggi e rimandare. `selectCommodities`
   fallisce forte su un simbolo sconosciuto invece di filtrare a vuoto —
   stesso principio di `getFreshnessConfig`, mai un default silenzioso
+  Dal 3 set 2026 c'è anche il target **`eu-fuel`**: un solo download da
+  4,3 MB copre 27 paesi, due carburanti, tutte le settimane, con prezzo
+  alla pompa E netto. Default a 10 anni anche qui (~28.000 righe).
 - `scripts/inspect-eu-history.ts` (3 set 2026) — ispeziona il file
   STORICO del bollettino UE ("Price developments 2005 onwards", ~4,3 MB),
   diverso da quello settimanale usato in `euOilBulletin.ts`. Contiene i
@@ -628,6 +750,36 @@ ponderata, import massivo storico, estrapolazioni causali.
 - **MIMIT** (prezzi distributori italiani): dataset enorme, richiede un
   modello di regione GERARCHICO (oggi `regions` è piatto) + retention +
   tabelle dedicate. Progetto separato con la sua fase di design
+- **Scomposizione fiscale — FATTA** (3 set 2026), ed è il contenuto che
+  differenzia il sito. Il numero, sui dati del 31 agosto: dei 177 millesimi
+  che l'Italia paga sopra la media dei 27, **155 sono imposte e 22 sono il
+  carburante**. In Italia il 51,4% del prezzo alla pompa è tassa (8ª in UE,
+  media 48%); per prezzo NETTO l'Italia è 18ª su 27 — il carburante da noi
+  non costa particolarmente tanto, costa tanto il litro finito. Estremi:
+  Malta 56,3% (ma è la più economica alla pompa), Svezia 29,6%.
+  Nessuno di questi è una stima: sono sottrazioni fra due colonne dello
+  stesso file, ripetibili ogni settimana per 27 paesi.
+- **DUE MEDIE UE DIVERSE — da sistemare.** Il file contiene le medie
+  calcolate dalla Commissione (colonne `EU_`), che NON coincidono con le
+  nostre: 1,950 €/L contro 1,840 sui dati del 31 agosto, **110 millesimi**.
+  La nostra è una media semplice dei paesi (Malta pesa come la Germania),
+  la loro è ponderata sui consumi. Con la loro, l'Italia è +67 e non +177.
+  Nessuna delle due è sbagliata — rispondono a domande diverse — ma il sito
+  ne mostra una e deve dire quale: le etichette ora dicono "media dei 27"
+  invece di "media UE" (mappa fatta; **metodologia e glossario da
+  allineare**).
+  Per mostrare ANCHE la ponderata servirebbe salvare la riga aggregata
+  `EU_`, e lì c'è un problema di modello: finirebbe in `regions` come se
+  fosse un paese, comparirebbe nella tabella carburanti e verrebbe
+  conteggiata dentro la nostra stessa media. Serve una colonna
+  `regions.kind` ('country' | 'aggregate') e quindi un'altra migrazione. È
+  il passo giusto ma è un passo suo — NON aggiungere `EU_` a `regions`
+  senza quella colonna.
+- **Fogli fiscali non ancora usati**: il file storico ha anche `VAT`,
+  `Excise duties`, `Excise duties - components`, `Other Indirect Taxes`.
+  Servirebbero a separare DENTRO le imposte quanto è accisa e quanto IVA —
+  oggi il sito mostra il totale. Sarebbe una terza voce nel registro
+  `MEASURES` della mappa. Struttura di quei fogli mai ispezionata.
 - **Storico: sbloccato** (3 set 2026). Prima c'erano 2 rilevazioni per
   serie — le variazioni si calcolavano su due punti e `HeroBackdrop` si
   rifiutava di disegnare (soglia: 8 rilevazioni). Ora `price_history` ha
