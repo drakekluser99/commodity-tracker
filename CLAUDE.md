@@ -121,7 +121,15 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   Ogni route (via `runMarketPriceCron` o direttamente) apre e chiude un
   record in `fetch_runs`. `ok: true` = "run finita senza eccezioni", NON
   "tutto salvato": `points_saved` sotto l'atteso (es. rate limit Alpha
-  Vantage a HTTP 200) è il segnale da leggere a valle
+  Vantage a HTTP 200) è il segnale da leggere a valle.
+  **`points_saved` conta le righe TOCCATE, non le date nuove** (3 set
+  2026): `savePricePoints` usa `onConflictDoUpdate`, quindi se la fonte
+  ripropone la stessa `recorded_at` l'upsert aggiorna la riga esistente e
+  la conta lo stesso. Un batch da 2 commodity riporta `points_saved: 2`
+  sia quando arriva un prezzo nuovo sia quando riscrive per la
+  centesima volta lo stesso. Non è una metrica di freschezza — per
+  quella si guarda `max(recorded_at)` nelle tabelle dati (vedi
+  "Diagnosi 3 set 2026" sotto)
 - `src/app/api/data/route.ts` — endpoint pubblico `GET /api/data`: JSON
   con gli ultimi prezzi (stessi dati della homepage, da `queries.ts`).
   CORS aperto (`Access-Control-Allow-Origin: *`) + handler `OPTIONS`
@@ -558,11 +566,57 @@ ponderata, import massivo storico, estrapolazioni causali.
 - **Audit ortografico (3 set 2026)**: fatto su tutto il testo visibile
   (homepage, metodologia, glossario, componenti, metadata, README,
   CONTRIBUTING). Nessun errore trovato
-- **Prossimo checkpoint (giovedì 3 set 2026)**: verificare in `fetch_runs`
-  il primo run automatico del cron `fetch-eu-fuel-prices` dopo le
-  modifiche di oggi (wordmark + fascia sintetica, commit `270b23c` e
-  `f266eb4`) — controllare che `ok: true` e che i valori di benzina/
-  diesel UE nella fascia sintetica si aggiornino di conseguenza
+- **Diagnosi pipeline dati (3 set 2026, ~11:00 UTC).** Prima query reale
+  su `fetch_runs` da quando la tabella esiste. Esito, fonte per fonte:
+  - **Alpha Vantage: sana.** I batch 1-3 erano partiti quel giorno alle
+    06:28 / 08:16 / 10:31 (orari `vercel.json` 06/08/10 UTC più il jitter
+    di ±59min di Hobby), i batch 4-5 all'orario del giorno prima perché
+    non era ancora il loro turno. Tutti `ok: true`, `points_saved: 2` =
+    il numero atteso (2 commodity per batch). **Il dato in pagina era
+    comunque vecchio**: metalli e agricole fermi al 1° luglio, energia
+    al 1° settembre. Non è un guasto nostro — la fonte non pubblica
+    (Alpha Vantage non aveva ancora rilasciato il mensile di agosto; le
+    serie giornaliere hanno un ritardo fisiologico di un paio di
+    giorni). `retrieved_at` avanzava ogni giorno, `recorded_at` no: è
+    esattamente la distinzione per cui le due colonne esistono separate
+  - **Carburanti UE: nessuna esecuzione automatica ancora osservata.**
+    L'unica run in tabella era del 1 set alle 08:43 — ma era un martedì,
+    e lo schedule è `0 12 * * 4` (giovedì 12:00 UTC). Era una chiamata
+    MANUALE (lo conferma la run USA 15 secondi dopo, 08:43:56). Il primo
+    giovedì utile da quando `fetch_runs` esiste era proprio il 3 set:
+    verifica ancora da fare dopo le 12:00 UTC
+  - **Domanda ancora aperta dopo questa diagnosi**: i due cron
+    carburanti scattano davvero da soli su Vercel? In `fetch_runs` non
+    c'è ancora nessuna loro esecuzione automatica — solo le due manuali
+    del 1 set. Le risposte arrivano da sole: UE giovedì dopo le 12:00
+    UTC, USA lunedì dopo le 18:00 UTC. Da controllare in quella run:
+    `ok: true` e i valori benzina/diesel UE che si aggiornano di
+    conseguenza nella fascia sintetica. Fino ad allora la domanda resta
+    senza risposta, e NON va data per risolta
+  - **Carburanti USA: nessun guasto in produzione.** La run in tabella
+    riporta `ok: false` + `errorText: "EIA_API_KEY non configurata"`, ma
+    su Vercel quella variabile ESISTE dal 27 ago in tutti e tre gli
+    ambienti (Production, Preview, Development) — verificato a schermo.
+    La conclusione corretta è che quella run **non girava su Vercel**:
+    era la chiamata manuale delle 08:43 fatta in LOCALE, dove
+    `.env.local` non ha `EIA_API_KEY`. Lo conferma la run UE 15 secondi
+    prima, riuscita con 54 punti: il fetcher UE scarica un XLSX pubblico
+    e non ha bisogno di chiavi, quindi in locale funziona lo stesso.
+    **Lezione da non ripetere**: una riga di `fetch_runs` non dice DOVE
+    ha girato il codice. Prima di dedurre un guasto in produzione da un
+    errore di configurazione, va confrontato con le variabili
+    effettivamente presenti su Vercel. Da sistemare comunque, ma è una
+    scomodità locale e non un problema del sito: aggiungere
+    `EIA_API_KEY` a `.env.local` sulla macchina di sviluppo, altrimenti
+    ogni chiamata manuale al cron USA continuerà a fallire e a sporcare
+    `fetch_runs` con errori fuorvianti
+- **Colonna `latest_recorded_at` in `fetch_runs` — da fare.** Nasce dalla
+  diagnosi sopra: siccome `points_saved` non distingue "dato nuovo" da
+  "stesso dato riscritto", per capire se una fonte è ferma servono due
+  query e un ragionamento. Salvando in ogni run la `recorded_at` più
+  recente vista, la differenza tra "la fonte è ferma" e "noi non
+  peschiamo" si legge in una riga sola. È anche il dato che serve alla
+  pagina pubblica "Stato dei dati"
 
 ## Skill: vercel-react-best-practices
 
