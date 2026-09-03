@@ -14,6 +14,7 @@ import {
   currencySymbol,
 } from "@/lib/format";
 import { computeFreshness, getFreshnessConfig } from "@/lib/freshness/compute";
+import { computeEuropeFuelStats } from "@/lib/europeFuelStats";
 import EuropeFuelMap from "@/components/EuropeFuelMap";
 import FuelImpactCalculator from "@/components/FuelImpactCalculator";
 import MobileNav from "@/components/MobileNav";
@@ -193,6 +194,8 @@ export default async function Home() {
     .sort((a, b) => Math.abs(b.changePct) - Math.abs(a.changePct))
     .slice(0, 5);
 
+  // Usata più sotto sia per il conteggio "fonti in linea" (raggruppata per
+  // continente → fonte) sia per la tabella carburanti raggruppata.
   const fuelsByContinent = new Map<string, typeof fuelPrices>();
   for (const fuel of fuelPrices) {
     const list = fuelsByContinent.get(fuel.continent) ?? [];
@@ -200,32 +203,16 @@ export default async function Home() {
     fuelsByContinent.set(fuel.continent, list);
   }
 
-  const europeFuelsByCountry = new Map<string, { petrol: number | null; diesel: number | null }>();
-  for (const f of fuelsByContinent.get("europe") ?? []) {
-    const existing = europeFuelsByCountry.get(f.regionName) ?? { petrol: null, diesel: null };
-    if (f.fuelType === "petrol") existing.petrol = parseFloat(f.price);
-    if (f.fuelType === "diesel") existing.diesel = parseFloat(f.price);
-    europeFuelsByCountry.set(f.regionName, existing);
-  }
-  const europeanFuelData = Array.from(europeFuelsByCountry.entries()).map(
-    ([countryName, data]) => ({ countryName, ...data })
-  );
-
-  function average(values: number[]): number | null {
-    if (values.length === 0) return null;
-    return values.reduce((sum, v) => sum + v, 0) / values.length;
-  }
-
-  const europeFuels = fuelsByContinent.get("europe") ?? [];
-  const europeAverage = {
-    petrol: average(
-      europeFuels.filter((f) => f.fuelType === "petrol").map((f) => parseFloat(f.price))
-    ),
-    diesel: average(
-      europeFuels.filter((f) => f.fuelType === "diesel").map((f) => parseFloat(f.price))
-    ),
-    currency: "EUR",
-  };
+  // La media dei 27 e il dato per paese vivono ora in lib/europeFuelStats:
+  // questa pagina e /paese/[slug] devono vederli calcolati nello STESSO
+  // modo, e prima di questa estrazione era logica duplicata — vedi il
+  // commento nel modulo per il perché. NOTA sulla parola "media": è la
+  // media SEMPLICE dei paesi presenti (Malta e la Germania pesano uguale),
+  // non quella ponderata sui consumi che pubblica la Commissione — per
+  // questo le etichette dicono "media dei 27" e non "media UE" (vedi la
+  // legenda della mappa e la pagina metodologia).
+  const { countries: europeanFuelData, average: europeAverage } =
+    computeEuropeFuelStats(fuelPrices);
 
   const usFuels = fuelsByContinent.get("north_america") ?? [];
   const usAverage = {
@@ -583,10 +570,39 @@ export default async function Home() {
           <section id="mappa" className="scroll-mt-8">
             <div className="flex items-baseline gap-3">
               <span className="font-mono text-xs text-system-ink-muted">01 /</span>
-              <h2 className="text-lg font-semibold text-system-ink">Prezzo benzina in Europa</h2>
+              {/* "Carburanti" e non "benzina": da quando la mappa ha il
+                  selettore, il titolo deve reggere entrambe le viste.
+                  Lasciarlo su "benzina" significava che scegliendo il
+                  diesel l'intestazione smentiva il grafico sotto.
+
+                  La strada alternativa — far seguire il titolo alla
+                  metrica attiva — richiederebbe di spostare l'h2 dentro il
+                  Client Component o di sollevare lo stato fin qui, e
+                  questa sarebbe l'unica sezione con un'intestazione
+                  renderizzata lato client: un'eccezione al modello di
+                  tutte le altre per un guadagno che i due chip, già
+                  visibili sopra la mappa, danno da soli. */}
+              <h2 className="text-lg font-semibold text-system-ink">
+                Prezzo dei carburanti in Europa
+              </h2>
             </div>
             <div className="mt-4 rounded-lg border border-system-border bg-system-surface p-4">
-              <EuropeFuelMap prices={europeanFuelData} euAveragePetrol={europeAverage.petrol} />
+              {/* `euAverage` con entrambi i carburanti, non solo la benzina:
+                  la mappa ora si può commutare su diesel, e ogni metrica ha
+                  bisogno della PROPRIA media come centro della scala
+                  divergente. Passargli la media della benzina mentre disegna
+                  il diesel colorerebbe mezza Europa dalla parte sbagliata.
+                  Resta un oggetto di soli numeri — un Client Component non
+                  accetta funzioni come prop. */}
+              <EuropeFuelMap
+                prices={europeanFuelData}
+                euAverage={{
+                  petrol: europeAverage.petrol,
+                  diesel: europeAverage.diesel,
+                  petrolNet: europeAverage.petrolNet,
+                  dieselNet: europeAverage.dieselNet,
+                }}
+              />
             </div>
             <SourceNote>
               Fonte: Bollettino Petrolifero Settimanale, Commissione Europea ·

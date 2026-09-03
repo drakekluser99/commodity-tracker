@@ -17,6 +17,15 @@ export interface LatestFuelPrice {
   continent: string;
   fuelType: string;
   price: string;
+  /**
+   * Prezzo al netto delle imposte, quando la fonte lo pubblica. `null` per
+   * l'EIA (che dà solo il prezzo alla pompa) e per le righe UE salvate
+   * prima che la colonna esistesse.
+   *
+   * Dove è null il carico fiscale NON si calcola: la pagina deve dirlo,
+   * non stimarlo per differenza da una media.
+   */
+  priceNet: string | null;
   currency: string;
   recordedAt: Date;
 }
@@ -67,6 +76,7 @@ export async function getLatestFuelPrices(): Promise<LatestFuelPrice[]> {
       continent: regions.continent,
       fuelType: retailFuelPrices.fuelType,
       price: retailFuelPrices.price,
+      priceNet: retailFuelPrices.priceNet,
       currency: retailFuelPrices.currency,
       recordedAt: retailFuelPrices.recordedAt,
     })

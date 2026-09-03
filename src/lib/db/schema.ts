@@ -99,6 +99,20 @@ export const retailFuelPrices = pgTable(
       .references(() => regions.id),
     fuelType: varchar("fuel_type", { length: 32 }).notNull(), // "petrol" | "diesel"
     price: numeric("price", { precision: 10, scale: 4 }).notNull(),
+    // Prezzo AL NETTO delle imposte, stessa unità e valuta di `price`.
+    // La differenza `price - price_net` è il carico fiscale: accisa, IVA e
+    // altre imposte indirette messe insieme.
+    //
+    // Nullable, e non con default 0, per due ragioni. La prima è storica:
+    // le righe salvate prima di questa colonna non hanno il netto e non lo
+    // avranno mai — uno zero le farebbe leggere come "100% tasse". La
+    // seconda è che la Commissione non pubblica il netto per ogni paese e
+    // ogni settimana: dove manca, il carico fiscale NON si calcola e la
+    // pagina deve dirlo, non stimarlo per differenza da una media.
+    //
+    // Solo la fonte `eu_weekly_oil_bulletin` la valorizza: l'EIA pubblica
+    // il prezzo alla pompa e basta.
+    priceNet: numeric("price_net", { precision: 10, scale: 4 }),
     currency: varchar("currency", { length: 3 }).notNull(), // ISO 4217, es. "EUR", "USD"
     unit: varchar("unit", { length: 16 }).notNull().default("liter"), // "liter" | "gallon"
     // Vedi price_history.retrievedAt: data del dato vs data di acquisizione.

@@ -1,6 +1,21 @@
 import ExcelJS from "exceljs";
 
 /**
+ * NON PIÙ COLLEGATO AL CRON (3 set 2026).
+ *
+ * Il cron del giovedì è passato a `euOilBulletinHistory.ts`, che scarica
+ * il file storico della Commissione: contiene le stesse settimane più il
+ * prezzo AL NETTO DELLE IMPOSTE, e le sue colonne hanno chiavi esplicite
+ * invece di intestazioni da riconoscere per somiglianza.
+ *
+ * Questo file resta per due ragioni: `scripts/inspect-eu-bulletin.ts` lo
+ * usa, ed è un parser validato contro dati reali che vale come ripiego se
+ * un giorno la Commissione smettesse di pubblicare il file storico. Non
+ * ricollegarlo al cron senza motivo — perderebbe il prezzo netto, e con
+ * quello la scomposizione fiscale.
+ */
+
+/**
  * URL ufficiale della Commissione Europea per il bollettino "prezzi con
  * tasse" più recente. L'ID del documento (264c2d0f-...) resta STABILE
  * settimana dopo settimana: solo il contenuto del file viene sostituito.
