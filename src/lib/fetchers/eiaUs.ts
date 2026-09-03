@@ -113,3 +113,78 @@ export async function fetchUsFuelPrices(
 
   return results;
 }
+
+/**
+ * Recupera lo STORICO settimanale completo, non solo l'ultima settimana.
+ *
+ * L'unica differenza rispetto a `fetchUsFuelPrices` è che qui non si tiene
+ * la prima riga per prodotto: si tengono tutte. La serie dell'EIA parte dal
+ * 1994 per la benzina e dal 1995 per il diesel, quindi sono circa 1.600
+ * settimane per prodotto — sotto il tetto di 5.000 righe per chiamata
+ * dell'API v2, e questo è il motivo per cui non serve paginare.
+ *
+ * L'ordinamento passa da `desc` ad `asc`: quando si legge uno storico si
+ * vuole scoprire subito da quando parte, non dove arriva.
+ */
+export async function fetchUsFuelHistory(
+  apiKey: string,
+  options: { fromDate?: string } = {}
+): Promise<UsFuelPricePoint[]> {
+  const url = new URL(EIA_BASE_URL);
+  url.searchParams.set("api_key", apiKey);
+  url.searchParams.set("frequency", "weekly");
+  url.searchParams.append("data[0]", "value");
+  url.searchParams.append("facets[product][]", PRODUCT_CODES.petrol);
+  url.searchParams.append("facets[product][]", PRODUCT_CODES.diesel);
+  url.searchParams.append("facets[duoarea][]", US_NATIONAL_AREA);
+  url.searchParams.append("sort[0][column]", "period");
+  url.searchParams.append("sort[0][direction]", "asc");
+  url.searchParams.set("length", "5000"); // massimo consentito dall'API v2
+  if (options.fromDate) url.searchParams.set("start", options.fromDate);
+
+  const res = await fetch(url.toString());
+  if (!res.ok) {
+    throw new Error(`EIA API ha risposto HTTP ${res.status}`);
+  }
+
+  const json = (await res.json()) as EiaApiResponse;
+  const rows = json.response?.data ?? [];
+
+  if (rows.length === 0) {
+    throw new Error(
+      "Nessun dato storico restituito dall'API EIA. Verifica i codici product/duoarea con scripts/inspect-eia.ts."
+    );
+  }
+
+  // Stessa verifica difensiva sull'unità di `fetchUsFuelPrices`: meglio
+  // fallire rumorosamente che riempire il database di 3.000 righe
+  // convertite con il fattore sbagliato.
+  const unexpectedUnit = rows.find((r) => !r.units?.includes("GAL"));
+  if (unexpectedUnit) {
+    throw new Error(
+      `Unità di misura inattesa dall'API EIA: "${unexpectedUnit.units}". Atteso qualcosa con "GAL".`
+    );
+  }
+
+  const fuelTypeByProduct: Record<string, "petrol" | "diesel"> = {
+    [PRODUCT_CODES.petrol]: "petrol",
+    [PRODUCT_CODES.diesel]: "diesel",
+  };
+
+  const results: UsFuelPricePoint[] = [];
+  for (const row of rows) {
+    const fuelType = fuelTypeByProduct[row.product];
+    const value = parseFloat(row.value);
+    // L'EIA lascia buchi nella serie (festività, settimane non rilevate):
+    // arrivano come stringa vuota o null. Si scartano.
+    if (!fuelType || !Number.isFinite(value)) continue;
+    results.push({
+      fuelType,
+      pricePerLiter: value / GALLONS_TO_LITERS,
+      currency: "USD",
+      date: row.period,
+    });
+  }
+
+  return results;
+}

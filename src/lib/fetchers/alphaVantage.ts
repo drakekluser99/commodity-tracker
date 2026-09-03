@@ -51,15 +51,43 @@ export interface NormalizedPricePoint {
 }
 
 /**
- * Recupera l'ultimo prezzo disponibile per una singola materia prima.
- * Alpha Vantage a volte restituisce "value": "." quando il dato per
- * quel giorno non è ancora disponibile: in quel caso scartiamo il punto.
+ * Intervallo da chiedere all'API per ciascuna categoria.
+ *
+ * Non è una preferenza nostra, è un limite della fonte: gli endpoint
+ * energia (WTI, BRENT, NATURAL_GAS) accettano daily/weekly/monthly, mentre
+ * metalli e agricole espongono solo monthly/quarterly/annual. Chiedere
+ * `daily` per il rame non dà un errore — la fonte restituisce comunque la
+ * serie mensile, e questo è il motivo per cui metalli e agricole nel sito
+ * si muovono una volta al mese mentre il petrolio si muove ogni giorno.
+ * Dichiararlo esplicitamente rende la cosa leggibile invece che
+ * sorprendente.
  */
-async function fetchOne(
+export function intervalForCategory(category: string): "daily" | "monthly" {
+  return category === "energy" ? "daily" : "monthly";
+}
+
+/**
+ * Recupera la SERIE COMPLETA di una materia prima, non solo l'ultimo punto.
+ *
+ * Questa funzione non esiste per fare una chiamata in più: è la stessa,
+ * identica chiamata che il cron fa già. Ogni risposta di Alpha Vantage
+ * contiene l'intero storico dentro `json.data` — anni di rilevazioni — e
+ * finora ne buttavamo via tutto tranne `data[0]`. Il backfill dello storico
+ * quindi non costa richieste aggiuntive alla fonte: costa solo smettere di
+ * scartare quello che è già nella risposta.
+ *
+ * `fromDate` taglia la serie: senza limite il WTI giornaliero torna indietro
+ * fino al 1986 e riempirebbe il database di righe che nessuna schermata del
+ * sito mostra.
+ */
+export async function fetchCommoditySeries(
   commodity: (typeof TRACKED_COMMODITIES)[number],
-  apiKey: string
-): Promise<NormalizedPricePoint | null> {
-  const url = `https://www.alphavantage.co/query?function=${commodity.functionName}&interval=daily&apikey=${apiKey}`;
+  apiKey: string,
+  options: { interval?: "daily" | "monthly"; fromDate?: string } = {}
+): Promise<NormalizedPricePoint[]> {
+  const interval =
+    options.interval ?? intervalForCategory(commodity.category);
+  const url = `https://www.alphavantage.co/query?function=${commodity.functionName}&interval=${interval}&apikey=${apiKey}`;
 
   const res = await fetch(url);
   if (!res.ok) {
@@ -80,24 +108,45 @@ async function fetchOne(
     console.error(
       `Alpha Vantage: risposta anomala per ${commodity.symbol} — ${anomalyMessage}`
     );
-    return null;
+    return [];
   }
 
-  // Alpha Vantage a volte restituisce "value": "." quando il dato per
-  // quel giorno non è ancora disponibile: in quel caso scartiamo il punto.
-  const latest = json.data?.[0];
-  if (!latest || latest.value === ".") {
-    return null;
-  }
+  const unit = json.unit ?? "unknown";
 
-  return {
-    symbol: commodity.symbol,
-    name: commodity.name,
-    category: commodity.category,
-    unit: json.unit ?? "unknown",
-    price: parseFloat(latest.value),
-    date: latest.date,
-  };
+  return (json.data ?? [])
+    // Alpha Vantage restituisce "value": "." quando per quella data il
+    // dato non esiste (festivi, giorni di mercato chiuso). Non è uno zero
+    // e non è un prezzo: si scarta, non si interpola.
+    .filter((row) => row.value !== "." && Number.isFinite(parseFloat(row.value)))
+    .filter((row) => !options.fromDate || row.date >= options.fromDate)
+    .map((row) => ({
+      symbol: commodity.symbol,
+      name: commodity.name,
+      category: commodity.category,
+      unit,
+      price: parseFloat(row.value),
+      date: row.date,
+    }));
+}
+
+/**
+ * Recupera l'ultimo prezzo disponibile per una singola materia prima.
+ * È il caso d'uso del cron quotidiano, ed è ora un sottile involucro
+ * attorno a `fetchCommoditySeries`: una sola implementazione del parsing
+ * e della gestione delle risposte anomale, così se la fonte cambia formato
+ * c'è un solo punto da correggere.
+ */
+async function fetchOne(
+  commodity: (typeof TRACKED_COMMODITIES)[number],
+  apiKey: string
+): Promise<NormalizedPricePoint | null> {
+  // `interval: "daily"` esplicito e non `intervalForCategory`: il cron si
+  // comportava già così per tutte e dieci le materie prime, e questo
+  // refactoring non deve cambiarne il comportamento di nascosto.
+  const series = await fetchCommoditySeries(commodity, apiKey, {
+    interval: "daily",
+  });
+  return series[0] ?? null;
 }
 
 // Dividiamo le 10 materie prime in 5 batch da 2. Storia di questa scelta:
