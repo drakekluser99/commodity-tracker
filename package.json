@@ -18,7 +18,10 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "inspect:eu-bulletin": "tsx scripts/inspect-eu-bulletin.ts",
-    "inspect:eia": "tsx scripts/inspect-eia.ts"
+    "inspect:eia": "tsx scripts/inspect-eia.ts",
+    "inspect:eu-history": "tsx scripts/inspect-eu-history.ts",
+    "backfill:commodities": "tsx scripts/backfill.ts commodities",
+    "backfill:us-fuel": "tsx scripts/backfill.ts us-fuel"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

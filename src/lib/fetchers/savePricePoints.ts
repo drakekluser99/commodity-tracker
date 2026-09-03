@@ -1,6 +1,22 @@
+import { sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { commodities, priceHistory } from "@/lib/db/schema";
 import type { NormalizedPricePoint } from "./alphaVantage";
+
+/**
+ * Quante righe per singola INSERT nel salvataggio massivo.
+ *
+ * Il driver è `neon-http`: ogni query è una richiesta HTTP a sé. Con
+ * `savePricePoints`, che fa due query per punto, salvare 10.000 rilevazioni
+ * significherebbe 20.000 richieste HTTP — ore di attesa. Raggruppandole in
+ * INSERT da 500 righe si scende a poche decine di richieste.
+ *
+ * Perché 500 e non 10.000 in un colpo solo: Postgres accetta al massimo
+ * 65.535 parametri per statement. Qui ogni riga ne usa 5, quindi il tetto
+ * teorico sarebbe ~13.000 righe; 500 tiene un margine ampio e mantiene ogni
+ * richiesta abbastanza piccola da non andare in timeout.
+ */
+const INSERT_CHUNK_SIZE = 500;
 
 /**
  * Salva un elenco di prezzi normalizzati nel database.
@@ -62,4 +78,117 @@ export async function savePricePoints(
   }
 
   return saved;
+}
+
+/**
+ * Variante di `savePricePoints` pensata per il backfill dello storico.
+ *
+ * Fa esattamente le stesse due cose — assicura l'anagrafica, poi scrive lo
+ * storico — ma con un profilo di query completamente diverso, perché il
+ * numero di punti è diverso di tre ordini di grandezza:
+ *
+ *   savePricePoints      →  2 query per punto.      Giusto per 2 punti.
+ *   savePricePointsBulk  →  1 query per commodity
+ *                           + 1 ogni 500 rilevazioni. Giusto per 10.000.
+ *
+ * Non sostituisce l'altra: il cron continua a usare `savePricePoints`, che
+ * è più semplice da leggere e sul suo carico di lavoro è indistinguibile.
+ * Sono due funzioni perché sono due problemi.
+ *
+ * L'upsert resta identico, e non è un dettaglio: significa che questo script
+ * si può rilanciare quante volte si vuole senza duplicare nulla. Se
+ * s'interrompe a metà, si rilancia e riprende — le righe già scritte vengono
+ * semplicemente riscritte con lo stesso valore.
+ */
+export async function savePricePointsBulk(
+  points: NormalizedPricePoint[],
+  source: string,
+  onProgress?: (written: number, total: number) => void
+) {
+  if (points.length === 0) return 0;
+
+  const retrievedAt = new Date();
+
+  // Passo 1: l'anagrafica. I punti in arrivo sono migliaia ma le materie
+  // prime distinte sono al massimo dieci, quindi si deduplica prima di
+  // toccare il database invece di fare un upsert per riga.
+  const bySymbol = new Map<string, NormalizedPricePoint>();
+  for (const point of points) {
+    if (!bySymbol.has(point.symbol)) bySymbol.set(point.symbol, point);
+  }
+
+  const commodityIdBySymbol = new Map<string, number>();
+  for (const point of bySymbol.values()) {
+    const [row] = await db
+      .insert(commodities)
+      .values({
+        symbol: point.symbol,
+        name: point.name,
+        category: point.category,
+        unit: point.unit,
+      })
+      .onConflictDoUpdate({
+        target: commodities.symbol,
+        set: { name: point.name, category: point.category, unit: point.unit },
+      })
+      .returning();
+    commodityIdBySymbol.set(point.symbol, row.id);
+  }
+
+  // Passo 2: lo storico, a blocchi.
+  //
+  // Deduplica sulla coppia (commodity, data) PRIMA di scrivere: se la stessa
+  // data comparisse due volte nello stesso INSERT, Postgres rifiuterebbe
+  // l'intero statement con "ON CONFLICT DO UPDATE command cannot affect row
+  // a second time". È un errore che non si vede mai scrivendo riga per riga
+  // e che si incontra sempre alla prima insert massiva.
+  const seen = new Set<string>();
+  const rows: Array<{
+    commodityId: number;
+    price: string;
+    recordedAt: Date;
+    retrievedAt: Date;
+    source: string;
+  }> = [];
+
+  for (const point of points) {
+    const commodityId = commodityIdBySymbol.get(point.symbol);
+    if (commodityId === undefined) continue;
+    const key = `${commodityId}|${point.date}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    rows.push({
+      commodityId,
+      price: point.price.toString(),
+      recordedAt: new Date(point.date),
+      retrievedAt,
+      source,
+    });
+  }
+
+  let written = 0;
+  for (let i = 0; i < rows.length; i += INSERT_CHUNK_SIZE) {
+    const chunk = rows.slice(i, i + INSERT_CHUNK_SIZE);
+    await db
+      .insert(priceHistory)
+      .values(chunk)
+      .onConflictDoUpdate({
+        target: [priceHistory.commodityId, priceHistory.recordedAt],
+        // `excluded` è la pseudo-tabella di Postgres che contiene la riga
+        // che si stava per inserire quando è emerso il conflitto. Qui è
+        // indispensabile: in un INSERT da 500 righe ogni riga ha un prezzo
+        // diverso, e scrivere un valore costante li appiattirebbe tutti
+        // sullo stesso numero. `retrievedAt` e `source` invece sono davvero
+        // uguali per l'intero blocco, quindi restano costanti.
+        set: {
+          price: sql`excluded.price`,
+          retrievedAt,
+          source,
+        },
+      });
+    written += chunk.length;
+    onProgress?.(written, rows.length);
+  }
+
+  return written;
 }
