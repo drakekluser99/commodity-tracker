@@ -583,7 +583,21 @@ export default async function Home() {
           <section id="mappa" className="scroll-mt-8">
             <div className="flex items-baseline gap-3">
               <span className="font-mono text-xs text-system-ink-muted">01 /</span>
-              <h2 className="text-lg font-semibold text-system-ink">Prezzo benzina in Europa</h2>
+              {/* "Carburanti" e non "benzina": da quando la mappa ha il
+                  selettore, il titolo deve reggere entrambe le viste.
+                  Lasciarlo su "benzina" significava che scegliendo il
+                  diesel l'intestazione smentiva il grafico sotto.
+
+                  La strada alternativa — far seguire il titolo alla
+                  metrica attiva — richiederebbe di spostare l'h2 dentro il
+                  Client Component o di sollevare lo stato fin qui, e
+                  questa sarebbe l'unica sezione con un'intestazione
+                  renderizzata lato client: un'eccezione al modello di
+                  tutte le altre per un guadagno che i due chip, già
+                  visibili sopra la mappa, danno da soli. */}
+              <h2 className="text-lg font-semibold text-system-ink">
+                Prezzo dei carburanti in Europa
+              </h2>
             </div>
             <div className="mt-4 rounded-lg border border-system-border bg-system-surface p-4">
               {/* `euAverage` con entrambi i carburanti, non solo la benzina:
