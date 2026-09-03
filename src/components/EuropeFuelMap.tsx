@@ -17,6 +17,13 @@ export interface CountryFuelData {
   countryName: string;
   petrol: number | null;
   diesel: number | null;
+  /**
+   * Prezzi al netto delle imposte. `null` dove la Commissione non li
+   * pubblica: in quel caso la quota fiscale non si calcola e il paese
+   * finisce nel grigio "nessun dato", che è la risposta onesta.
+   */
+  petrolNet: number | null;
+  dieselNet: number | null;
 }
 
 interface Props {
@@ -33,7 +40,12 @@ interface Props {
    * Components" — un errore che né `tsc` né `eslint` catturano (vedi la
    * voce corrispondente in CLAUDE.md).
    */
-  euAverage: { petrol: number | null; diesel: number | null };
+  euAverage: {
+    petrol: number | null;
+    diesel: number | null;
+    petrolNet: number | null;
+    dieselNet: number | null;
+  };
 }
 
 // Hex reali dei token system-* (vedi globals.css @theme) — lo stile SVG di
@@ -64,16 +76,64 @@ const NO_DATA_FILL = "#f0ebe0"; // system-border-subtle — fallback "nessun dat
  * registro dovesse arrivare da `page.tsx`, delle funzioni al suo interno
  * lo renderebbero impossibile da serializzare.
  */
-type MetricKey = "petrol" | "diesel";
+type FuelKey = "petrol" | "diesel";
+type MeasureKey = "price" | "taxShare";
 
-const METRICS: ReadonlyArray<{
-  key: MetricKey;
+const FUELS: ReadonlyArray<{ key: FuelKey; label: string }> = [
+  { key: "petrol", label: "Benzina" },
+  { key: "diesel", label: "Diesel" },
+];
+
+/**
+ * Le due grandezze che la mappa sa disegnare.
+ *
+ * Sono due DIMENSIONI separate — carburante e misura — e non quattro voci
+ * in una fila sola. Con quattro chip ("benzina", "diesel", "quota benzina",
+ * "quota diesel") il lettore deve ricostruire da sé che sono due assi
+ * incrociati; con due file di due, la struttura è visibile.
+ *
+ * `unit` e `format` stanno qui e non nel componente perché sono ciò che
+ * distingue una misura dall'altra: un prezzo si scrive con tre decimali e
+ * "€/L", una quota con uno e "%". Aggiungere una terza misura in futuro
+ * (per esempio la sola accisa, dai fogli fiscali del file storico) vuol
+ * dire aggiungere una voce qui.
+ */
+const MEASURES: ReadonlyArray<{
+  key: MeasureKey;
   label: string;
   unit: string;
+  format: (value: number) => string;
 }> = [
-  { key: "petrol", label: "Benzina", unit: "€/L" },
-  { key: "diesel", label: "Diesel", unit: "€/L" },
+  { key: "price", label: "Prezzo", unit: "€/L", format: formatFuelPrice },
+  {
+    key: "taxShare",
+    label: "Quota fiscale",
+    unit: "%",
+    format: (v) => v.toLocaleString("it-IT", { maximumFractionDigits: 1 }),
+  },
 ];
+
+/**
+ * Il valore di un paese per una data combinazione carburante × misura.
+ *
+ * La quota fiscale è `(pompa − netto) / pompa`, cioè quanta parte del
+ * prezzo finale è imposta. Restituisce `null` se manca il netto: NON si
+ * ripiega su una stima, perché un carico fiscale inventato su un sito che
+ * promette fonte-data-limiti costa più di una cella vuota.
+ */
+function metricValue(
+  data: CountryFuelData,
+  fuel: FuelKey,
+  measure: MeasureKey
+): number | null {
+  const gross = data[fuel];
+  if (gross === null || !Number.isFinite(gross)) return null;
+  if (measure === "price") return gross;
+
+  const net = fuel === "petrol" ? data.petrolNet : data.dieselNet;
+  if (net === null || !Number.isFinite(net) || gross <= 0) return null;
+  return ((gross - net) / gross) * 100;
+}
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
   const clean = hex.replace("#", "");
@@ -148,7 +208,8 @@ function divergingColor(
  */
 export default function EuropeFuelMap({ prices, euAverage }: Props) {
   const [hovered, setHovered] = useState<CountryFuelData | null>(null);
-  const [metric, setMetric] = useState<MetricKey>("petrol");
+  const [fuel, setFuel] = useState<FuelKey>("petrol");
+  const [measure, setMeasure] = useState<MeasureKey>("price");
 
   // `useId` e non un id fisso: se un domani la pagina montasse due mappe,
   // due <linearGradient> con lo stesso id nello stesso DOM collidono e
@@ -156,14 +217,33 @@ export default function EuropeFuelMap({ prices, euAverage }: Props) {
   // PriceHistoryChart.tsx.
   const gradientId = useId();
 
-  const activeMetric = METRICS.find((m) => m.key === metric) ?? METRICS[0];
-  const average = euAverage[metric];
+  const activeMeasure = MEASURES.find((m) => m.key === measure) ?? MEASURES[0];
+  const activeFuel = FUELS.find((f) => f.key === fuel) ?? FUELS[0];
+
+  /**
+   * Il centro della scala divergente.
+   *
+   * Per il prezzo è la media UE calcolata in page.tsx. Per la quota
+   * fiscale NON è la media delle quote dei 27 paesi, ma la quota della
+   * media: `(media pompa − media netto) / media pompa`. È la risposta alla
+   * domanda "del litro medio europeo, quanto è tassa", mentre la media
+   * delle percentuali risponde a "qual è la quota del paese tipico" —
+   * pesano Malta e la Germania allo stesso modo, e sono numeri diversi.
+   * La prima è quella che la riga sotto la mappa afferma.
+   */
+  const average = useMemo(() => {
+    if (measure === "price") return euAverage[fuel];
+    const gross = euAverage[fuel];
+    const net = fuel === "petrol" ? euAverage.petrolNet : euAverage.dieselNet;
+    if (gross === null || net === null || gross <= 0) return null;
+    return ((gross - net) / gross) * 100;
+  }, [euAverage, fuel, measure]);
 
   const stats = useMemo(() => {
     const withValue = prices
-      .map((p) => ({ country: p, value: p[metric] }))
+      .map((p) => ({ country: p, value: metricValue(p, fuel, measure) }))
       .filter((r): r is { country: CountryFuelData; value: number } =>
-        r.value !== null && Number.isFinite(r.value)
+        r.value !== null
       );
 
     // Senza dati non si calcolano estremi: `Math.min()` su un array vuoto
@@ -181,7 +261,7 @@ export default function EuropeFuelMap({ prices, euAverage }: Props) {
       max: sorted[sorted.length - 1].value,
       byCountry: new Map(withValue.map((r) => [r.country.countryName, r.value])),
     };
-  }, [prices, metric]);
+  }, [prices, fuel, measure]);
 
   const dataByCountry = useMemo(
     () => new Map(prices.map((p) => [p.countryName, p])),
@@ -190,35 +270,25 @@ export default function EuropeFuelMap({ prices, euAverage }: Props) {
 
   const span = stats ? stats.max - stats.min : 0;
   const italy = prices.find((p) => p.countryName === "Italy") ?? null;
-  const italyValue = italy?.[metric] ?? null;
+  const italyValue = italy ? metricValue(italy, fuel, measure) : null;
 
   return (
     <div className="relative">
       {/* Selettore della metrica. Chip e non un <select>: sono due voci, e
           un menu a tendina nasconderebbe l'esistenza della seconda. */}
-      <div
-        className="mb-3 flex items-center gap-2"
-        role="group"
-        aria-label="Carburante mostrato sulla mappa"
-      >
-        {METRICS.map((m) => {
-          const isActive = m.key === metric;
-          return (
-            <button
-              key={m.key}
-              type="button"
-              onClick={() => setMetric(m.key)}
-              aria-pressed={isActive}
-              className={`rounded-md border px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.1em] transition-colors ${
-                isActive
-                  ? "border-system-accent bg-system-surface text-system-accent"
-                  : "border-system-border text-system-ink-muted hover:border-system-accent hover:text-system-accent"
-              }`}
-            >
-              {m.label}
-            </button>
-          );
-        })}
+      <div className="mb-3 flex flex-wrap items-center gap-x-6 gap-y-2">
+        <Chips
+          label="Carburante"
+          options={FUELS}
+          active={fuel}
+          onSelect={setFuel}
+        />
+        <Chips
+          label="Misura"
+          options={MEASURES}
+          active={measure}
+          onSelect={setMeasure}
+        />
       </div>
 
       <ComposableMap
@@ -304,30 +374,56 @@ export default function EuropeFuelMap({ prices, euAverage }: Props) {
           <div className="font-medium">
             {localizedCountryName(hovered.countryName)}
           </div>
-          {METRICS.map((m) => {
-            const v = hovered[m.key];
-            if (v === null) return null;
+          {/* Il tooltip mostra sempre TUTTE e quattro le combinazioni, con
+              in evidenza quella attiva. È il punto in cui il costo di
+              mostrare più dati è zero — sono già in memoria — e il
+              guadagno è che si legge "2,017 €/L di cui il 51,4% è tassa"
+              senza dover cambiare vista. */}
+          {FUELS.map((f) =>
+            MEASURES.map((m) => {
+              const v = metricValue(hovered, f.key, m.key);
+              if (v === null) return null;
+              const isActive = f.key === fuel && m.key === measure;
+              return (
+                <div
+                  key={`${f.key}-${m.key}`}
+                  className={`mt-1 flex items-center justify-between gap-4 ${
+                    isActive ? "text-system-ink" : "text-system-ink-muted"
+                  }`}
+                >
+                  <span className="text-xs">
+                    {f.label}
+                    {m.key === "taxShare" ? " · imposte" : ""}
+                  </span>
+                  <span className="font-mono tabular-nums">
+                    {m.format(v)} {m.unit}
+                  </span>
+                </div>
+              );
+            })
+          )}
+          {(() => {
+            const v = metricValue(hovered, fuel, measure);
+            if (v === null || average === null) return null;
+            // Millesimi per i prezzi, punti percentuali per le quote: dire
+            // "+177 millesimi" di una percentuale sarebbe un'unità
+            // inventata.
+            const delta =
+              measure === "price" ? (v - average) * 1000 : v - average;
+            const suffisso =
+              measure === "price" ? "millesimi" : "punti percentuali";
             return (
-              <div
-                key={m.key}
-                className={`mt-1 flex items-center justify-between gap-4 ${
-                  m.key === metric ? "text-system-ink" : "text-system-ink-muted"
-                }`}
-              >
-                <span className="text-xs">{m.label}</span>
-                <span className="font-mono tabular-nums">
-                  {formatFuelPrice(v)} {m.unit}
-                </span>
+              <div className="mt-1 border-t border-system-border-subtle pt-1 text-xs text-system-ink-muted">
+                {delta > 0 ? "+" : delta < 0 ? "−" : ""}
+                {measure === "price"
+                  ? Math.abs(delta).toFixed(0)
+                  : Math.abs(delta).toLocaleString("it-IT", {
+                      maximumFractionDigits: 1,
+                    })}{" "}
+                {suffisso} vs media UE
               </div>
             );
-          })}
-          {hovered[metric] !== null && average !== null && (
-            <div className="mt-1 border-t border-system-border-subtle pt-1 text-xs text-system-ink-muted">
-              {hovered[metric]! > average ? "+" : "−"}
-              {Math.abs((hovered[metric]! - average) * 1000).toFixed(0)}{" "}
-              millesimi vs media UE
-            </div>
-          )}
+          })()}
         </div>
       )}
 
@@ -345,7 +441,7 @@ export default function EuropeFuelMap({ prices, euAverage }: Props) {
             preserveAspectRatio="none"
             className="h-3 w-full"
             role="img"
-            aria-label={`Scala colore: da ${formatFuelPrice(stats.min)} a ${formatFuelPrice(stats.max)} ${activeMetric.unit}, centro sulla media UE ${formatFuelPrice(average)}`}
+            aria-label={`Scala colore: da ${activeMeasure.format(stats.min)} a ${activeMeasure.format(stats.max)} ${activeMeasure.unit}, centro sulla media UE ${activeMeasure.format(average)}`}
           >
             <defs>
               <linearGradient id={gradientId} x1="0" x2="1" y1="0" y2="0">
@@ -379,16 +475,21 @@ export default function EuropeFuelMap({ prices, euAverage }: Props) {
           </svg>
           <div className="mt-1 flex justify-between font-mono text-[11px] text-system-ink-muted">
             <span className="tabular-nums">
-              {formatFuelPrice(stats.min)} {activeMetric.unit}
+              {activeMeasure.format(stats.min)} {activeMeasure.unit}
             </span>
+            {/* "media dei 27" e non "media UE" e basta: è una media
+                semplice dei paesi, e la Commissione ne pubblica una
+                ponderata sui consumi che vale 11 centesimi in più. Dire
+                quale si sta guardando è lo stesso principio delle note
+                "Fonte:" sotto ogni sezione. */}
             <span className="uppercase tracking-wider">
-              media UE{" "}
+              media dei 27{" "}
               <span className="tabular-nums text-system-ink">
-                {formatFuelPrice(average)}
+                {activeMeasure.format(average)} {activeMeasure.unit}
               </span>
             </span>
             <span className="tabular-nums">
-              {formatFuelPrice(stats.max)} {activeMetric.unit}
+              {activeMeasure.format(stats.max)} {activeMeasure.unit}
             </span>
           </div>
         </div>
@@ -405,7 +506,9 @@ export default function EuropeFuelMap({ prices, euAverage }: Props) {
             label="Più economico"
             country={stats.cheapest.country.countryName}
             value={stats.cheapest.value}
-            unit={activeMetric.unit}
+            unit={activeMeasure.unit}
+            format={activeMeasure.format}
+            measure={measure}
             average={average}
             span={span}
           />
@@ -413,7 +516,9 @@ export default function EuropeFuelMap({ prices, euAverage }: Props) {
             label="Italia"
             country="Italy"
             value={italyValue}
-            unit={activeMetric.unit}
+            unit={activeMeasure.unit}
+            format={activeMeasure.format}
+            measure={measure}
             average={average}
             span={span}
           />
@@ -421,7 +526,9 @@ export default function EuropeFuelMap({ prices, euAverage }: Props) {
             label="Più caro"
             country={stats.dearest.country.countryName}
             value={stats.dearest.value}
-            unit={activeMetric.unit}
+            unit={activeMeasure.unit}
+            format={activeMeasure.format}
+            measure={measure}
             average={average}
             span={span}
           />
@@ -448,6 +555,8 @@ function ExtremeCell({
   country,
   value,
   unit,
+  format,
+  measure,
   average,
   span,
 }: {
@@ -455,6 +564,8 @@ function ExtremeCell({
   country: string;
   value: number | null;
   unit: string;
+  format: (value: number) => string;
+  measure: MeasureKey;
   average: number | null;
   span: number;
 }) {
@@ -464,7 +575,11 @@ function ExtremeCell({
       : NO_DATA_FILL;
 
   const delta =
-    value !== null && average !== null ? (value - average) * 1000 : null;
+    value !== null && average !== null
+      ? measure === "price"
+        ? (value - average) * 1000
+        : value - average
+      : null;
 
   return (
     <div className="bg-system-surface px-3 py-2">
@@ -481,15 +596,73 @@ function ExtremeCell({
           {localizedCountryName(country)}
         </span>
         <span className="ml-auto font-mono text-sm tabular-nums text-system-ink">
-          {value !== null ? `${formatFuelPrice(value)} ${unit}` : "n/d"}
+          {value !== null ? `${format(value)} ${unit}` : "n/d"}
         </span>
       </div>
       {delta !== null && (
         <div className="mt-0.5 text-right font-mono text-[11px] tabular-nums text-system-ink-muted">
           {delta > 0 ? "+" : delta < 0 ? "−" : ""}
-          {Math.abs(delta).toFixed(0)} millesimi vs media
+          {measure === "price"
+            ? Math.abs(delta).toFixed(0)
+            : Math.abs(delta).toLocaleString("it-IT", {
+                maximumFractionDigits: 1,
+              })}{" "}
+          {measure === "price" ? "millesimi" : "punti"} vs media
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Una fila di chip a selezione singola, con la sua etichetta.
+ *
+ * Estratta perché ora ce ne sono due e sarebbero state due blocchi
+ * identici a meno di un nome. Il generico `<T extends string>` serve a non
+ * perdere il tipo: `onSelect` riceve esattamente `FuelKey` o `MeasureKey`,
+ * non una stringa qualunque, quindi un refuso nel valore di un'opzione lo
+ * prende il compilatore invece della pagina.
+ *
+ * Chip e non un <select>: le voci sono due per fila, e una tendina
+ * nasconderebbe l'esistenza della seconda proprio dove il punto è farla
+ * scoprire.
+ */
+function Chips<T extends string>({
+  label,
+  options,
+  active,
+  onSelect,
+}: {
+  label: string;
+  options: ReadonlyArray<{ key: T; label: string }>;
+  active: T;
+  onSelect: (key: T) => void;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-system-ink-muted">
+        {label}
+      </span>
+      <div className="flex items-center gap-1.5" role="group" aria-label={label}>
+        {options.map((o) => {
+          const isActive = o.key === active;
+          return (
+            <button
+              key={o.key}
+              type="button"
+              onClick={() => onSelect(o.key)}
+              aria-pressed={isActive}
+              className={`rounded-md border px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.1em] transition-colors ${
+                isActive
+                  ? "border-system-accent bg-system-surface text-system-accent"
+                  : "border-system-border text-system-ink-muted hover:border-system-accent hover:text-system-accent"
+              }`}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

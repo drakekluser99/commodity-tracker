@@ -7,7 +7,24 @@ import { formatFuelPrice, currencySymbol } from "@/lib/format";
 export interface RegionFuelAverage {
   petrol: number | null;
   diesel: number | null;
+  /**
+   * Prezzi medi al NETTO delle imposte. Presenti solo per l'Europa: la
+   * Commissione li pubblica, l'EIA no. Dove mancano, le righe fiscali
+   * mostrano "—" invece di una stima.
+   */
+  petrolNet?: number | null;
+  dieselNet?: number | null;
   currency: string;
+}
+
+/** Imposte al litro: prezzo alla pompa meno prezzo netto. */
+function taxPerLiter(
+  gross: number | null | undefined,
+  net: number | null | undefined
+): number | null {
+  if (gross === null || gross === undefined) return null;
+  if (net === null || net === undefined) return null;
+  return gross - net;
 }
 
 interface Props {
@@ -116,6 +133,38 @@ export default function FuelImpactCalculator({ europe, us }: Props) {
         d.diesel !== null
           ? formatMoney(d.diesel * truck.numericValue, d.currency)
           : "—",
+    },
+    // Le due righe fiscali chiudono il ragionamento del calcolatore. Fino a
+    // ieri il pieno era un numero e basta; adesso dice anche quanta parte
+    // di quel numero non è carburante. È la stessa sottrazione della mappa
+    // — prezzo alla pompa meno prezzo netto — portata sulla cifra che una
+    // persona riconosce, perché "51,4%" è un'informazione e "di questo
+    // pieno, 26 € sono imposte" è la stessa informazione dopo che ti ha
+    // toccato.
+    //
+    // Mostrano "—" per gli Stati Uniti, dove l'EIA non pubblica il netto.
+    // Una cella vuota è la risposta corretta: il carico fiscale americano
+    // non si stima applicando la percentuale europea.
+    {
+      key: "tank-tax",
+      label: `di cui imposte, sul pieno`,
+      value: (d) => {
+        const tax = taxPerLiter(d.petrol, d.petrolNet);
+        return tax !== null
+          ? formatMoney(tax * tank.numericValue, d.currency)
+          : "—";
+      },
+    },
+    {
+      key: "tax-share",
+      label: "Quota fiscale del prezzo",
+      value: (d) => {
+        const tax = taxPerLiter(d.petrol, d.petrolNet);
+        if (tax === null || d.petrol === null || d.petrol <= 0) return "—";
+        return `${((tax / d.petrol) * 100).toLocaleString("it-IT", {
+          maximumFractionDigits: 1,
+        })} %`;
+      },
     },
   ];
 

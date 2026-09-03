@@ -202,9 +202,24 @@ export default async function Home() {
 
   const europeFuelsByCountry = new Map<string, { petrol: number | null; diesel: number | null }>();
   for (const f of fuelsByContinent.get("europe") ?? []) {
-    const existing = europeFuelsByCountry.get(f.regionName) ?? { petrol: null, diesel: null };
-    if (f.fuelType === "petrol") existing.petrol = parseFloat(f.price);
-    if (f.fuelType === "diesel") existing.diesel = parseFloat(f.price);
+    const existing = europeFuelsByCountry.get(f.regionName) ?? {
+      petrol: null,
+      diesel: null,
+      petrolNet: null,
+      dieselNet: null,
+    };
+    // `priceNet` arriva come stringa o null: `parseFloat(null)` darebbe
+    // NaN, che è un numero e passerebbe indenne fino alla mappa colorando
+    // il paese di niente. Il ternario tiene il null un null.
+    const net = f.priceNet !== null ? parseFloat(f.priceNet) : null;
+    if (f.fuelType === "petrol") {
+      existing.petrol = parseFloat(f.price);
+      existing.petrolNet = net;
+    }
+    if (f.fuelType === "diesel") {
+      existing.diesel = parseFloat(f.price);
+      existing.dieselNet = net;
+    }
     europeFuelsByCountry.set(f.regionName, existing);
   }
   const europeanFuelData = Array.from(europeFuelsByCountry.entries()).map(
@@ -217,6 +232,31 @@ export default async function Home() {
   }
 
   const europeFuels = fuelsByContinent.get("europe") ?? [];
+
+  /**
+   * Media dei prezzi al netto delle imposte.
+   *
+   * `filter` sui soli valori presenti e non `map` con degli zeri: un paese
+   * senza prezzo netto deve USCIRE dalla media, non entrarci come zero e
+   * tirarla giù. Per la stessa ragione la media netta può essere calcolata
+   * su meno paesi di quella lorda — ed è corretto che sia così.
+   */
+  function averageNet(rows: typeof europeFuels, fuelType: string): number | null {
+    return average(
+      rows
+        .filter((f) => f.fuelType === fuelType && f.priceNet !== null)
+        .map((f) => parseFloat(f.priceNet!))
+    );
+  }
+
+  // NOTA sulla parola "media". Questa è la media SEMPLICE dei paesi
+  // presenti: Malta e la Germania pesano uguale. La Commissione ne
+  // pubblica una ponderata sui consumi, che sugli stessi dati del 31
+  // agosto vale 1,950 €/L contro i nostri 1,840 — undici centesimi di
+  // differenza, e l'Italia passa da +177 a +67 millesimi sopra la media.
+  // Nessuna delle due è sbagliata, rispondono a domande diverse. Finché
+  // mostriamo questa, le etichette devono dire "media dei 27" e non
+  // "media UE": vedi la legenda della mappa e la pagina metodologia.
   const europeAverage = {
     petrol: average(
       europeFuels.filter((f) => f.fuelType === "petrol").map((f) => parseFloat(f.price))
@@ -224,6 +264,8 @@ export default async function Home() {
     diesel: average(
       europeFuels.filter((f) => f.fuelType === "diesel").map((f) => parseFloat(f.price))
     ),
+    petrolNet: averageNet(europeFuels, "petrol"),
+    dieselNet: averageNet(europeFuels, "diesel"),
     currency: "EUR",
   };
 
@@ -612,6 +654,8 @@ export default async function Home() {
                 euAverage={{
                   petrol: europeAverage.petrol,
                   diesel: europeAverage.diesel,
+                  petrolNet: europeAverage.petrolNet,
+                  dieselNet: europeAverage.dieselNet,
                 }}
               />
             </div>
