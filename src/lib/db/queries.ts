@@ -1,6 +1,12 @@
-import { eq, desc, gte } from "drizzle-orm";
+import { eq, desc, gte, and, inArray } from "drizzle-orm";
 import { db } from "./client";
-import { commodities, priceHistory, regions, retailFuelPrices } from "./schema";
+import {
+  commodities,
+  priceHistory,
+  regions,
+  retailFuelPrices,
+  weeklyNarratives,
+} from "./schema";
 
 export interface LatestCommodityPrice {
   symbol: string;
@@ -152,4 +158,99 @@ export async function getFuelPriceHistory(
     .innerJoin(regions, eq(retailFuelPrices.regionId, regions.id))
     .where(gte(retailFuelPrices.recordedAt, sinceDate))
     .orderBy(retailFuelPrices.recordedAt);
+}
+
+export interface WeekFuelPriceRow {
+  regionName: string;
+  fuelType: string;
+  price: string;
+  priceNet: string | null;
+}
+
+/**
+ * Le righe carburante d'Europa delle DUE date di rilevazione più recenti
+ * presenti in tabella — non "ultimi 14 giorni": se una settimana del
+ * bollettino saltasse, questa funzione confronta comunque le due
+ * rilevazioni vere più vicine, non un intervallo fisso che potrebbe non
+ * contenerne nessuna. Sorgente per generateWeeklyNarrative.
+ */
+export async function getLastTwoEuropeFuelWeeks(): Promise<{
+  current: WeekFuelPriceRow[];
+  previous: WeekFuelPriceRow[];
+  currentDate: Date | null;
+}> {
+  const dateRows = await db
+    .selectDistinct({ recordedAt: retailFuelPrices.recordedAt })
+    .from(retailFuelPrices)
+    .innerJoin(regions, eq(retailFuelPrices.regionId, regions.id))
+    .where(eq(regions.continent, "europe"))
+    .orderBy(desc(retailFuelPrices.recordedAt))
+    .limit(2);
+
+  // Meno di due settimane in tabella: nessun confronto possibile ancora
+  // (es. subito dopo il primo deploy). Nessuna narrazione, non un errore.
+  if (dateRows.length < 2) {
+    return { current: [], previous: [], currentDate: null };
+  }
+  const [currentDate, previousDate] = dateRows.map((r) => r.recordedAt);
+
+  const rows = await db
+    .select({
+      regionName: regions.name,
+      fuelType: retailFuelPrices.fuelType,
+      price: retailFuelPrices.price,
+      priceNet: retailFuelPrices.priceNet,
+      recordedAt: retailFuelPrices.recordedAt,
+    })
+    .from(retailFuelPrices)
+    .innerJoin(regions, eq(retailFuelPrices.regionId, regions.id))
+    .where(
+      and(
+        eq(regions.continent, "europe"),
+        inArray(retailFuelPrices.recordedAt, [currentDate, previousDate])
+      )
+    );
+
+  return {
+    current: rows.filter(
+      (r) => r.recordedAt.getTime() === currentDate.getTime()
+    ),
+    previous: rows.filter(
+      (r) => r.recordedAt.getTime() === previousDate.getTime()
+    ),
+    currentDate,
+  };
+}
+
+export interface WeeklyNarrativeRow {
+  weekOf: Date;
+  kind: string;
+  text: string;
+}
+
+/**
+ * Le narrazioni dell'ULTIMA settimana generata, non l'intero archivio —
+ * è quello che compare in home. L'archivio (una pagina che elenca tutte
+ * le settimane passate) resta un possibile passo successivo: i dati sono
+ * già lì, salvati settimana per settimana, pronti per quando servirà.
+ */
+export async function getLatestWeeklyNarratives(): Promise<
+  WeeklyNarrativeRow[]
+> {
+  const [latest] = await db
+    .select({ weekOf: weeklyNarratives.weekOf })
+    .from(weeklyNarratives)
+    .orderBy(desc(weeklyNarratives.weekOf))
+    .limit(1);
+  if (!latest) return [];
+
+  return db
+    .select({
+      weekOf: weeklyNarratives.weekOf,
+      kind: weeklyNarratives.kind,
+      text: weeklyNarratives.text,
+    })
+    .from(weeklyNarratives)
+    .where(eq(weeklyNarratives.weekOf, latest.weekOf))
+    .orderBy(weeklyNarratives.kind);
 }
