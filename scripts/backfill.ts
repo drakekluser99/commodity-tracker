@@ -1,7 +1,7 @@
 /**
  * Backfill dello storico prezzi.
  *
- *   npx tsx scripts/backfill.ts commodities [--from AAAA-MM-GG] [--dry-run]
+ *   npx tsx scripts/backfill.ts commodities [--from AAAA-MM-GG] [--only SIMBOLI] [--dry-run]
  *   npx tsx scripts/backfill.ts us-fuel     [--from AAAA-MM-GG] [--dry-run]
  *
  * Perché uno script e non una rotta di cron: è un'operazione una tantum, che
@@ -14,6 +14,11 @@
  *
  * `--dry-run` scarica e conta senza scrivere: il modo giusto di vedere quanti
  * punti arriverebbero, e da che data, prima di toccare il database.
+ *
+ * `--only COTTON,SUGAR,COFFEE` limita la corsa ad alcuni simboli. Serve a
+ * riprendere un backfill interrotto dalla quota di Alpha Vantage senza
+ * riscaricare quelli già salvati: su ~25 richieste al giorno, condivise con
+ * i cinque cron, ogni richiesta sprecata è un simbolo che non recuperi oggi.
  */
 import "dotenv/config";
 import { config } from "dotenv";
@@ -30,17 +35,8 @@ config({ path: ".env.local", override: false });
 async function main() {
   const [target, ...rest] = process.argv.slice(2);
   const dryRun = rest.includes("--dry-run");
-  // Accetta sia `--from=2015-01-01` sia `--from 2015-01-01`. L'indexOf va
-  // controllato: senza il ramo esplicito, quando `--from` manca indexOf
-  // restituisce -1 e `rest[0]` finirebbe per essere letto come data —
-  // passando "--dry-run" al posto di un giorno.
-  const eqArg = rest.find((a) => a.startsWith("--from="));
-  const spaceIdx = rest.indexOf("--from");
-  const fromDate = eqArg
-    ? eqArg.slice("--from=".length)
-    : spaceIdx >= 0
-      ? rest[spaceIdx + 1]
-      : undefined;
+  const fromDate = readFlag(rest, "--from");
+  const only = readFlag(rest, "--only");
 
   if (fromDate !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(fromDate)) {
     console.error(`Data non valida per --from: "${fromDate}". Attesa AAAA-MM-GG.`);
@@ -48,15 +44,35 @@ async function main() {
   }
 
   if (target === "commodities") {
-    await backfillCommodities({ fromDate, dryRun });
+    await backfillCommodities({ fromDate, dryRun, only });
   } else if (target === "us-fuel") {
     await backfillUsFuel({ fromDate, dryRun });
   } else {
-    console.error(
-      "Uso: npx tsx scripts/backfill.ts <commodities|us-fuel> [--from AAAA-MM-GG] [--dry-run]"
-    );
+    console.error(USAGE);
     process.exit(1);
   }
+}
+
+const USAGE = `Uso: npx tsx scripts/backfill.ts <commodities|us-fuel> [opzioni]
+
+  --from AAAA-MM-GG   data di partenza dello storico (default: 10 anni fa)
+  --only SIMBOLI      solo queste materie prime, separate da virgola
+                      (es. --only COTTON,SUGAR,COFFEE)
+  --dry-run           scarica e conta senza scrivere`;
+
+/**
+ * Legge un'opzione accettando sia `--nome=valore` sia `--nome valore`.
+ *
+ * Il ramo esplicito sull'indice non è pedanteria: `indexOf` restituisce -1
+ * quando l'opzione manca, e `rest[-1 + 1]` è `rest[0]` — cioè il primo
+ * argomento qualunque esso sia. Senza il controllo, `--dry-run` finirebbe
+ * per essere letto come se fosse una data.
+ */
+function readFlag(args: string[], name: string): string | undefined {
+  const inline = args.find((a) => a.startsWith(`${name}=`));
+  if (inline) return inline.slice(name.length + 1);
+  const idx = args.indexOf(name);
+  return idx >= 0 ? args[idx + 1] : undefined;
 }
 
 /**
@@ -75,6 +91,7 @@ async function main() {
 async function backfillCommodities(opts: {
   fromDate?: string;
   dryRun: boolean;
+  only?: string;
 }) {
   const { TRACKED_COMMODITIES, fetchCommoditySeries, intervalForCategory } =
     await import("../src/lib/fetchers/alphaVantage");
@@ -86,18 +103,28 @@ async function backfillCommodities(opts: {
     );
   }
 
+  // `--only` esiste per una ragione precisa: il piano gratuito di Alpha
+  // Vantage concede ~25 richieste al giorno, condivise con i cinque cron
+  // quotidiani. Al primo lancio reale (3 set 2026) la quota si è esaurita
+  // sulle ultime tre materie prime, e senza questo filtro riprenderle
+  // significherebbe riscaricare anche le sette già salvate — sette
+  // richieste su venticinque buttate per riscrivere righe identiche.
+  const commodityList = selectCommodities(TRACKED_COMMODITIES, opts.only);
+
   // Default a 10 anni: senza limite il WTI giornaliero risale al 1986 e
   // scriverebbe decine di migliaia di righe che nessuna schermata mostra.
   // Il grafico più lungo del sito guarda 90 giorni; dieci anni lasciano
   // spazio a finestre annuali e a confronti storici senza gonfiare il
   // database.
   const fromDate = opts.fromDate ?? tenYearsAgo();
-  console.log(`Backfill materie prime da ${fromDate}\n`);
+  console.log(
+    `Backfill materie prime da ${fromDate} — ${commodityList.length} di ${TRACKED_COMMODITIES.length} simboli, ${commodityList.length} richieste ad Alpha Vantage\n`
+  );
 
   const all: Awaited<ReturnType<typeof fetchCommoditySeries>> = [];
 
-  for (let i = 0; i < TRACKED_COMMODITIES.length; i++) {
-    const commodity = TRACKED_COMMODITIES[i];
+  for (let i = 0; i < commodityList.length; i++) {
+    const commodity = commodityList[i];
     if (i > 0) await sleep(2000);
 
     const interval = intervalForCategory(commodity.category);
@@ -175,6 +202,42 @@ async function backfillUsFuel(opts: { fromDate?: string; dryRun: boolean }) {
     (w, t) => process.stdout.write(`\r  scrittura ${w}/${t}`)
   );
   console.log(`\nScritte ${written} righe in retail_fuel_prices.`);
+}
+
+/**
+ * Filtra le materie prime in base a `--only`.
+ *
+ * Fallisce forte su un simbolo sconosciuto invece di ignorarlo: un refuso
+ * come `--only COTON` che si limitasse a non trovare nulla lascerebbe
+ * credere che il backfill sia andato a buon fine su zero righe. Lo stesso
+ * principio del lookup in src/lib/freshness/compute.ts — mai un default
+ * silenzioso su una configurazione sbagliata.
+ */
+function selectCommodities<T extends { readonly symbol: string }>(
+  all: readonly T[],
+  only: string | undefined
+): readonly T[] {
+  if (!only) return all;
+
+  const wanted = only
+    .split(",")
+    .map((s) => s.trim().toUpperCase())
+    .filter(Boolean);
+
+  const known = new Set(all.map((c) => c.symbol));
+  const unknown = wanted.filter((s) => !known.has(s));
+  if (unknown.length > 0) {
+    console.error(
+      `Simboli sconosciuti in --only: ${unknown.join(", ")}\n` +
+        `Disponibili: ${all.map((c) => c.symbol).join(", ")}`
+    );
+    process.exit(1);
+  }
+
+  // Si filtra `all` invece di mappare `wanted`: così l'ordine resta quello
+  // canonico di TRACKED_COMMODITIES e un simbolo ripetuto per errore
+  // sulla riga di comando non produce due richieste.
+  return all.filter((c) => wanted.includes(c.symbol));
 }
 
 function tenYearsAgo(): string {
