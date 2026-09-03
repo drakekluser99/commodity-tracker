@@ -83,3 +83,16 @@ export function fuelUnitFromCurrency(currency: string): string {
 export function currencySymbol(currency: string): string {
   return currency === "EUR" ? "€" : currency === "USD" ? "$" : currency;
 }
+
+/**
+ * Data in formato it-IT (es. "03/09/2026"). Era definita solo dentro
+ * page.tsx: spostata qui perché ora serve anche alle pagine /paese/[slug],
+ * ed è comunque formattazione — lo stesso motivo per cui vive questo file.
+ */
+export function formatDate(date: Date): string {
+  return new Intl.DateTimeFormat("it-IT", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(date);
+}

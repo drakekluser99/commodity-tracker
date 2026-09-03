@@ -14,6 +14,7 @@ import {
   currencySymbol,
 } from "@/lib/format";
 import { computeFreshness, getFreshnessConfig } from "@/lib/freshness/compute";
+import { computeEuropeFuelStats } from "@/lib/europeFuelStats";
 import EuropeFuelMap from "@/components/EuropeFuelMap";
 import FuelImpactCalculator from "@/components/FuelImpactCalculator";
 import MobileNav from "@/components/MobileNav";
@@ -193,6 +194,8 @@ export default async function Home() {
     .sort((a, b) => Math.abs(b.changePct) - Math.abs(a.changePct))
     .slice(0, 5);
 
+  // Usata più sotto sia per il conteggio "fonti in linea" (raggruppata per
+  // continente → fonte) sia per la tabella carburanti raggruppata.
   const fuelsByContinent = new Map<string, typeof fuelPrices>();
   for (const fuel of fuelPrices) {
     const list = fuelsByContinent.get(fuel.continent) ?? [];
@@ -200,74 +203,16 @@ export default async function Home() {
     fuelsByContinent.set(fuel.continent, list);
   }
 
-  const europeFuelsByCountry = new Map<string, { petrol: number | null; diesel: number | null }>();
-  for (const f of fuelsByContinent.get("europe") ?? []) {
-    const existing = europeFuelsByCountry.get(f.regionName) ?? {
-      petrol: null,
-      diesel: null,
-      petrolNet: null,
-      dieselNet: null,
-    };
-    // `priceNet` arriva come stringa o null: `parseFloat(null)` darebbe
-    // NaN, che è un numero e passerebbe indenne fino alla mappa colorando
-    // il paese di niente. Il ternario tiene il null un null.
-    const net = f.priceNet !== null ? parseFloat(f.priceNet) : null;
-    if (f.fuelType === "petrol") {
-      existing.petrol = parseFloat(f.price);
-      existing.petrolNet = net;
-    }
-    if (f.fuelType === "diesel") {
-      existing.diesel = parseFloat(f.price);
-      existing.dieselNet = net;
-    }
-    europeFuelsByCountry.set(f.regionName, existing);
-  }
-  const europeanFuelData = Array.from(europeFuelsByCountry.entries()).map(
-    ([countryName, data]) => ({ countryName, ...data })
-  );
-
-  function average(values: number[]): number | null {
-    if (values.length === 0) return null;
-    return values.reduce((sum, v) => sum + v, 0) / values.length;
-  }
-
-  const europeFuels = fuelsByContinent.get("europe") ?? [];
-
-  /**
-   * Media dei prezzi al netto delle imposte.
-   *
-   * `filter` sui soli valori presenti e non `map` con degli zeri: un paese
-   * senza prezzo netto deve USCIRE dalla media, non entrarci come zero e
-   * tirarla giù. Per la stessa ragione la media netta può essere calcolata
-   * su meno paesi di quella lorda — ed è corretto che sia così.
-   */
-  function averageNet(rows: typeof europeFuels, fuelType: string): number | null {
-    return average(
-      rows
-        .filter((f) => f.fuelType === fuelType && f.priceNet !== null)
-        .map((f) => parseFloat(f.priceNet!))
-    );
-  }
-
-  // NOTA sulla parola "media". Questa è la media SEMPLICE dei paesi
-  // presenti: Malta e la Germania pesano uguale. La Commissione ne
-  // pubblica una ponderata sui consumi, che sugli stessi dati del 31
-  // agosto vale 1,950 €/L contro i nostri 1,840 — undici centesimi di
-  // differenza, e l'Italia passa da +177 a +67 millesimi sopra la media.
-  // Nessuna delle due è sbagliata, rispondono a domande diverse. Finché
-  // mostriamo questa, le etichette devono dire "media dei 27" e non
-  // "media UE": vedi la legenda della mappa e la pagina metodologia.
-  const europeAverage = {
-    petrol: average(
-      europeFuels.filter((f) => f.fuelType === "petrol").map((f) => parseFloat(f.price))
-    ),
-    diesel: average(
-      europeFuels.filter((f) => f.fuelType === "diesel").map((f) => parseFloat(f.price))
-    ),
-    petrolNet: averageNet(europeFuels, "petrol"),
-    dieselNet: averageNet(europeFuels, "diesel"),
-    currency: "EUR",
-  };
+  // La media dei 27 e il dato per paese vivono ora in lib/europeFuelStats:
+  // questa pagina e /paese/[slug] devono vederli calcolati nello STESSO
+  // modo, e prima di questa estrazione era logica duplicata — vedi il
+  // commento nel modulo per il perché. NOTA sulla parola "media": è la
+  // media SEMPLICE dei paesi presenti (Malta e la Germania pesano uguale),
+  // non quella ponderata sui consumi che pubblica la Commissione — per
+  // questo le etichette dicono "media dei 27" e non "media UE" (vedi la
+  // legenda della mappa e la pagina metodologia).
+  const { countries: europeanFuelData, average: europeAverage } =
+    computeEuropeFuelStats(fuelPrices);
 
   const usFuels = fuelsByContinent.get("north_america") ?? [];
   const usAverage = {

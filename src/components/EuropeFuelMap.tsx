@@ -7,8 +7,10 @@ import {
   Geography,
   ZoomableGroup,
 } from "react-simple-maps";
+import Link from "next/link";
 import { localizedCountryName } from "@/lib/countryNames";
 import { formatFuelPrice } from "@/lib/format";
+import { routeForCountry } from "@/lib/countries";
 
 const GEO_URL =
   "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-50m.json";
@@ -581,8 +583,12 @@ function ExtremeCell({
         : value - average
       : null;
 
-  return (
-    <div className="bg-system-surface px-3 py-2">
+  // Ogni riquadro nominato porta alla pagina di quel paese, quando esiste
+  // (i 27 UE — vedi lib/countries.ts). `routeForCountry` torna `null` per un
+  // nome fuori registro: in quel caso resta un <div>, non un link rotto.
+  const route = routeForCountry(country);
+  const content = (
+    <>
       <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-system-ink-muted">
         {label}
       </div>
@@ -610,8 +616,20 @@ function ExtremeCell({
           {measure === "price" ? "millesimi" : "punti"} vs media
         </div>
       )}
-    </div>
+    </>
   );
+
+  if (route) {
+    return (
+      <Link
+        href={`/paese/${route.slug}`}
+        className="block bg-system-surface px-3 py-2 transition-colors hover:bg-system-panel"
+      >
+        {content}
+      </Link>
+    );
+  }
+  return <div className="bg-system-surface px-3 py-2">{content}</div>;
 }
 
 /**
