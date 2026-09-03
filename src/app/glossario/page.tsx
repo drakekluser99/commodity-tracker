@@ -121,14 +121,18 @@ export default function Glossario() {
           </ul>
         </Section>
 
-        <Section index="05" title="Il badge «non aggiornato»">
+        <Section index="05" title="I badge «in attesa» e «non aggiornato»">
           <p className="text-sm leading-relaxed text-system-ink-secondary">
-            Compare accanto alla data di una materia prima quando
-            l&apos;ultimo valore che abbiamo è più vecchio del ritardo
-            atteso per la sua cadenza. Non significa che il dato sia
-            sbagliato: significa che potrebbe non essere quello corrente.
-            Le soglie precise e il ragionamento dietro il badge sono
-            spiegati nella{" "}
+            Compaiono accanto alla data di una materia prima quando
+            l&apos;ultimo valore che abbiamo comincia a essere vecchio
+            rispetto alla cadenza attesa per quella fonte. Sono due stadi,
+            non uno: <strong>&quot;in attesa&quot;</strong> quando il
+            ritardo è ancora dentro un margine di tolleranza normale (un
+            weekend, una festività), <strong>&quot;non aggiornato&quot;</strong>{" "}
+            quando anche quel margine è superato. In entrambi i casi non
+            significa che il dato sia sbagliato: significa che potrebbe non
+            essere quello corrente. Le soglie precise e il ragionamento
+            dietro i due badge sono spiegati nella{" "}
             <Link
               href="/metodologia"
               className="text-system-accent hover:underline"

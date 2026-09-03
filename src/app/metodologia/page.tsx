@@ -59,13 +59,28 @@ export default function Metodologia() {
             riferisce a questo: aggiornati regolarmente, non istantanei.
           </p>
           <p className="mt-3 text-sm leading-relaxed text-system-ink-secondary">
-            Quando una serie di materie prime resta ferma oltre il ritardo
-            atteso per la sua cadenza (14 giorni per le giornaliere, 75 per
-            le mensili), nella tabella compare un badge{" "}
-            <strong>&quot;non aggiornato&quot;</strong> accanto alla data: il
-            valore mostrato è l&apos;ultimo che abbiamo, ma potrebbe non
-            essere quello corrente.
+            Ogni serie ha tre stati possibili, calcolati confrontando la data
+            dell&apos;ultimo valore con la cadenza attesa per quella fonte:
           </p>
+          <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-relaxed text-system-ink-secondary">
+            <li>
+              <strong>Aggiornato</strong> — nessun badge: l&apos;ultimo
+              valore rientra nella cadenza attesa (1 giorno per petrolio e
+              gas naturale, 7 per i carburanti, 30 per metalli e agricole).
+            </li>
+            <li>
+              <strong>&quot;In attesa&quot;</strong> — la cadenza attesa è
+              passata da poco, ma restiamo dentro un margine di tolleranza
+              (3 giorni per le serie giornaliere e settimanali, 10 per le
+              mensili) pensato per coprire un ritardo occasionale della
+              fonte: un weekend, una festività, una pubblicazione slittata.
+            </li>
+            <li>
+              <strong>&quot;Non aggiornato&quot;</strong> — anche il margine
+              di tolleranza è superato: il valore mostrato è l&apos;ultimo
+              che abbiamo, ma potrebbe non essere più quello corrente.
+            </li>
+          </ul>
         </Section>
 
         <Section index="03" title="Limiti da conoscere">
@@ -89,9 +104,18 @@ export default function Metodologia() {
               ancora.
             </li>
             <li>
-              La media UE mostrata è una <strong>media semplice</strong>{" "}
-              tra i 27 paesi, non ponderata per popolazione o consumi
-              reali di ciascun paese.
+              La <strong>&quot;media dei 27&quot;</strong> mostrata in mappa
+              e in tabella è una media <strong>semplice</strong> tra i 27
+              paesi UE: Malta pesa quanto la Germania. La Commissione
+              Europea pubblica anche una propria media, ponderata sui
+              consumi reali di ciascun paese, e le due non coincidono —
+              quella ponderata è più alta di circa 11 centesimi al litro.
+              Non sono in contraddizione: rispondono a domande diverse
+              (&quot;qual è il prezzo tipico di un paese UE&quot; contro
+              &quot;quanto paga in media il litro effettivamente consumato
+              in Europa&quot;), e per questo qui si usa sempre l&apos;etichetta
+              esplicita &quot;media dei 27&quot; invece del generico
+              &quot;media UE&quot;.
             </li>
           </ul>
         </Section>
