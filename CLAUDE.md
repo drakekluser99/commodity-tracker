@@ -1,9 +1,16 @@
 @AGENTS.md
 
-# Prezzario — contesto del progetto
+# Mercuriale — contesto del progetto
 
-(Nome visualizzato del sito: "Prezzario". Il repository GitHub resta
-`commodity-tracker`, così come i nomi di file e le variabili interne.)
+(Nome visualizzato del sito: "Mercuriale" — dal nome storico italiano del
+listino ufficiale dei prezzi all'ingrosso pubblicato dalle Camere di
+Commercio. Rinominato il 3 set 2026, prima si chiamava "Prezzario": quel
+nome è un termine tecnico già occupato — in Italia il *prezzario* è
+l'elenco dei prezzi unitari per le opere pubbliche che ogni Regione
+pubblica per legge — quindi prometteva un contenuto diverso da quello del
+sito e metteva la ricerca organica in competizione con la pubblica
+amministrazione. Il repository GitHub resta `commodity-tracker`, così come
+i nomi di file e le variabili interne.)
 
 Progetto open source che raccoglie e mostra prezzi di materie prime globali
 e carburanti al consumo, ispirato nello spirito (non nei contenuti) a
@@ -130,47 +137,63 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   `border-l` tra le colonne (solo `lg`); colonna "Progetto" con
   Metodologia + Glossario. Tabella materie prime: badge a 3 stati nella
   colonna Data (da `src/lib/freshness/`) — nessun badge se `aggiornato`,
-  `system-accent-wait` (ambra/ocra) se `in_attesa`, `system-accent-down`
-  (ruggine, invariato) se `non_aggiornato`. `LinkedinGlyph` è una SVG
+  `system-signal-wait` (ocra) se `in_attesa`, `system-signal-up`
+  (ruggine) se `non_aggiornato`. `LinkedinGlyph` è una SVG
   inline (lucide non ha icone brand). Footer, colonna "Progetto": il link
   "Codice sorgente" (1 set 2026) riusa `Code2` di lucide — già usato per
   lo stesso `GITHUB_URL` nell'header — invece di una SVG brand dedicata,
   per coerenza col fatto che l'header stesso non tenta un logo GitHub
   reale (non esiste in lucide 1.34.0, vedi "Errori noti").
 
-  **Header (1 set 2026, brief punti 17+25)**: "Prezzario" è ora il
-  wordmark visivo dominante — icona `ProvenanceStamp` 36px + testo
-  `text-4xl sm:text-5xl font-bold text-system-ink`, con la tagline
-  "Progetto open source" sotto (`ml-[46px]`, valore tarato a video per
-  cadere sotto la "P" del wordmark — non deducibile a mente da
-  icona+gap, va riverificato a video se cambiano dimensioni/font).
-  L'eyebrow piccolo che prima portava "Prezzario · Progetto open source"
-  è sparito, assorbito nel wordmark (tenerlo insieme al wordmark grande
-  avrebbe duplicato il nome due volte). L'h1 esistente ("Prezzi di
-  materie prime e carburanti") resta l'elemento semantico h1 — per
-  SEO/accessibilità: è il testo che descrive il CONTENUTO della pagina,
-  il nome del prodotto da solo non porta segnale tematico — solo
-  ristilizzato a sottotitolo (`text-lg sm:text-xl font-medium`). Sotto,
-  la fascia sintetica a 4 valori (array `headerStats`, variabile locale
-  in `Home()`) sostituisce il vecchio `StatusLabel` a valore singolo:
-  Brent (da `commodityRows`, riga con `symbol === "BRENT"`), benzina e
-  diesel media UE (`europeAverage.petrol`/`.diesel` — già calcolate per
-  `EuropeFuelMap`/`FuelImpactCalculator`, nessuna nuova query), ultimo
-  dato (`lastUpdated`, invariato). `StatusLabel` (pallino STATICO —
-  niente animazione, i dati non sono uno stream) viene riusato 4 volte
-  in serie invece di un componente nuovo, con lo stesso pattern di
-  divisori `border-l` già visto nel footer: attivo solo da `lg` in su,
-  sotto è `grid grid-cols-2` (un `border-l` cadrebbe a metà riga quando
-  le tile vanno a capo — stesso motivo già documentato per il footer).
-  Fallback `"n/d"` per singola tile se un valore manca (fonte non ancora
-  pubblicata), mai l'omissione della tile: la griglia resta stabile a 4
-  colonne
+  **Header e footer (3 set 2026, restyling "chrome scuro")**: header e
+  footer stanno su `bg-system-chrome`, le sezioni in mezzo restano
+  sull'avorio. L'header contiene, nell'ordine:
+  1. `HeroBackdrop` (`src/components/HeroBackdrop.tsx`) — la curva reale
+     del Brent a 90 giorni disegnata in filigrana dietro il wordmark,
+     dalla serie `commoditySeries` già calcolata (nessuna nuova query).
+     È in posizione assoluta e ritagliata dall'`overflow-hidden`
+     dell'header; nascosta sotto `sm` (con `preserveAspectRatio="none"`
+     su uno schermo stretto e alto diventa una montagna verticale che
+     compete col wordmark). **Attenzione**: essendo posizionata, dipinge
+     sopra il contenuto in flusso normale — per questo `TickerBand` e la
+     `<nav>` hanno `relative`. Toglierlo fa riapparire la curva sopra la
+     fascia.
+  2. Wordmark "MERCURIALE" (`ProvenanceStamp` 38px + testo maiuscolo
+     spaziato, `text-[30px]` su mobile → `sm:text-4xl` → `lg:text-5xl`:
+     la scala mobile è tarata a video, a `text-4xl` il wordmark andava
+     sotto l'hamburger a 390px). Resta un `<p>`, non un heading — l'h1
+     vero è la riga sotto, che descrive il CONTENUTO della pagina
+     (rilevante per SEO/accessibilità); il nome del prodotto da solo non
+     porta segnale tematico. L'occhiello sotto ha un cursore lampeggiante
+     (`animate-caret`), `aria-hidden` + `select-none`.
+  3. `TickerBand` (`src/components/TickerBand.tsx`) — la fascia sintetica,
+     ora a 5 valori: Brent, benzina UE, diesel UE, ultimo dato, e **fonti
+     in linea** (nuova, 3 set 2026). Ogni valore ha sotto una riga di
+     contesto: variazione percentuale nella finestra della serie (dai
+     `priceMovers` già calcolati) per i primi tre, cadenza per gli ultimi
+     due. Sostituisce la fila di 4 `StatusLabel` — componente RIMOSSO in
+     questo commit, non più usato da nessuna parte.
+     "Fonti in linea" (`sourcesOnline / sourcesTotal`) conta le fonti che
+     hanno almeno una serie nello stato `aggiornato`: non è una lettura di
+     `fetch_runs` (quella dice se il nostro cron è partito), dice se il
+     DATO è arrivato. Per i carburanti la fonte si deduce dal continente
+     via `CONTINENT_SOURCES` in `page.tsx` — mappa esplicita e NON
+     esaustiva di proposito, perché `getFreshnessConfig` lancia un errore
+     sulle fonti sconosciute: un continente non mappato resta fuori dal
+     conteggio invece di far saltare la homepage.
+  4. La `<nav>` a piena larghezza sul chrome, con Metodologia e Glossario
+     spinti a destra da `ml-auto`.
+  Il footer ha lo stesso trattamento più un filo ambra (`h-0.5
+  bg-system-chrome-accent/50`) come segno di chiusura. `MobileNav`: il
+  pulsante hamburger usa i token `system-chrome-*` (vive nell'header), il
+  pannello a tendina resta chiaro come le sezioni dati.
+
 - `src/app/metodologia/page.tsx` — pagina trasparenza (fonti, limiti,
   frequenza aggiornamento, licenza MIT). Spiega anche il badge "non
   aggiornato" e documenta l'API pubblica `/api/data` (sezione 05, con
   esempio di risposta). **NON ancora aggiornata (1 set 2026) al modello
   di freshness a 3 stati**: descrive solo il badge binario di prima,
-  non menziona lo stato `in_attesa` (`system-accent-wait`)
+  non menziona lo stato `in_attesa` (`system-signal-wait`)
 - `src/app/glossario/page.tsx` — pagina FAQ/glossario (WTI vs Brent,
   Weekly Oil Bulletin, EIA, cadenza giornaliera vs mensile, badge "non
   aggiornato" → rimanda a metodologia). Stesso pattern di
@@ -183,10 +206,10 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   finiscono ai bordi sud-est. Scala colore divergente centrata sulla
   media UE (`euAveragePetrol`, 1 set 2026), non più rampa monocroma
   min/max — scarto firmato `(prezzo - media) /
-  (max - min)`, clampato con fattore `*2`, verde (`system-accent`) sotto
-  media / ruggine (`system-accent-down`) sopra, centro neutro
+  (max - min)`, clampato con fattore `*2`, verde (`system-signal-down`) sotto
+  media / ruggine (`system-signal-up`) sopra, centro neutro
   `system-border` (NON `system-panel`, troppo simile al fill "nessun
-  dato" `#eef0f3`). Box fissi "più economico/più caro" RIMOSSI (erano
+  dato" `#f0ebe0`). Box fissi "più economico/più caro" RIMOSSI (erano
   sovrapposti alla cartografia); sostituiti da una riga sotto la mappa
   `MINIMO | MEDIA UE | MASSIMO`. Il tooltip hover mostra comunque lo
   scostamento testuale (`± millesimi vs media UE`) — il colore non è
@@ -216,7 +239,7 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   a chip (una serie alla volta — unità/valute incompatibili tra serie,
   vedi commento nel file). `AreaChart`/`Area` di recharts (1 set 2026,
   era `LineChart`/`Line`), `type="monotone"` invariato: sotto la linea
-  c'è una `<linearGradient>` che sfuma da `system-accent` (opacità 0.25)
+  c'è una `<linearGradient>` che sfuma da `system-accent` (ambra, opacità 0.25)
   a trasparente. L'`id` del gradiente viene da `useId()`, NON un id
   fisso in stringa — la homepage monta due istanze insieme (materie
   prime + carburanti) e un id fisso in `<defs>` farebbe collidere i due
@@ -234,13 +257,23 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
 
 - Commenti in italiano, spiegano il "perché" non il "cosa" (il progetto
   serve anche per imparare, chi legge il codice vuole capire le scelte)
-- Font: `body` usa Geist Sans (`var(--font-geist-sans)`, caricato in
-  `layout.tsx`); `font-mono` (Geist Mono) per prezzi, date, unità, codici.
-  NON rimettere `Arial` letterale sul body (vinceva su Geist).
-- Il sito è **light-only** per scelta: `globals.css` ha `color-scheme:
-  light` e nessun blocco `prefers-color-scheme: dark`. Non aggiungere un
-  dark mode parziale (ribaltare `--background` senza ridefinire i token
-  `system-*` lascia body scuro e pannelli chiari).
+- Font: `body` usa IBM Plex Sans (`var(--font-plex-sans)`, caricato in
+  `layout.tsx`); `font-mono` (IBM Plex Mono) per prezzi, date, unità,
+  codici. Erano Geist Sans/Mono fino al 3 set 2026: Plex è una
+  superfamiglia con Sans e Mono disegnati insieme, quindi le cifre in
+  colonna e il testo che le descrive hanno lo stesso "colore" tipografico.
+  I pesi vanno dichiarati esplicitamente in `layout.tsx` (Plex NON è una
+  variable font su Google Fonts: senza `weight`, next/font non sa quali
+  file scaricare). NON rimettere `Arial` letterale sul body.
+- **Schema cromatico: chrome scuro + dati chiari** (restyling 3 set 2026).
+  Header, fascia sintetica, barra di navigazione e footer sono su bruno
+  scuro (token `system-chrome-*`); tutte le sezioni di dati — tabelle,
+  mappa, grafici, calcolatore — restano su avorio chiaro. Non è un dark
+  mode: non c'è nessun blocco `prefers-color-scheme: dark` e `globals.css`
+  dichiara `color-scheme: light` (tutti gli input del sito vivono nelle
+  sezioni chiare). Non aggiungere un dark mode parziale, e non spostare
+  contenuto-dato sul chrome: la scelta è che i numeri si leggano scuri su
+  chiaro, che è più riposante per la lettura estesa.
 - Formattazione di numeri/unità/valute nella UI: sempre via
   `src/lib/format.ts` (separatori it-IT). Mai `toFixed` col punto nei
   componenti. Il dato grezzo (DB, `/api/data`, export CSV/JSON) NON si
@@ -248,10 +281,30 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
 - Palette colori: token `system-*` definiti in `src/app/globals.css` dentro
   `@theme` (Tailwind v4, non `tailwind.config.ts`). Non scrivere più hex a
   mano nelle classi — usare sempre le utility generate:
-  - `system-bg` (#fafafa) — sfondo pagina
-  - `system-panel` (#f2f3f5) — sfondo pannelli secondari, PIATTO, stesso
+  Rinnovata il 3 set 2026 (era verde petrolio su grigio freddo, ora ambra
+  su avorio caldo — vedi il blocco di commento in testa a `globals.css`
+  per il perché). **Attenzione a due separazioni che è facile ricompattare
+  per sbaglio:**
+
+  1. **Accento di marca ≠ colori di segnale.** Prima `system-accent`
+     faceva entrambi i lavori (era il verde del brand E il colore di
+     "prezzo in discesa"): funzionava per caso, perché verde = giù. Con
+     l'ambra no — ambra e ruggine sono vicine e le due direzioni
+     diventerebbero indistinguibili. Ora `system-accent` è SOLO marca, e
+     il significato sta in `system-signal-*`. Se cambia il marchio, il
+     significato dei numeri non deve cambiare.
+  2. **Ogni colore ha una versione per fondo chiaro e una per fondo
+     scuro.** `system-accent` (#8a5a10) è tarato per l'avorio,
+     `system-chrome-accent` (#e8a33d) per il bruno; idem per i segnali
+     (`system-signal-up` vs `system-chrome-signal-up`). Usare quello
+     sbagliato dà testo illeggibile — la ruggine #b0461f sul bruno del
+     chrome dà circa 2.3:1, sotto ogni soglia. Non "riusare lo stesso hex
+     tanto si vede".
+
+  - `system-bg` (#f8f5ee) — sfondo pagina
+  - `system-panel` (#f0ebe0) — sfondo pannelli secondari, PIATTO, stesso
     piano della pagina (es. hover di riga tabella)
-  - `system-surface` (#ffffff, 1 set 2026) — sfondo di una card/pannello
+  - `system-surface` (#fffdf8, 1 set 2026) — sfondo di una card/pannello
     SOLLEVATO sopra `system-bg` (header, footer, tabelle, tooltip,
     dropdown, input di ricerca), sempre accoppiato a un bordo o un'ombra.
     Diverso da `system-panel` proprio per questo: non è piatto. Introdotto
@@ -259,18 +312,32 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
     (stesso ruolo, nessun token dedicato prima) — trovati durante l'audit
     design system sotto, migrati 1:1 (nessuna modifica visiva: bianco
     puro prima e dopo)
-  - `system-ink` (#111318) — testo principale
-  - `system-ink-secondary` (#5b6472) — testo secondario (paragrafi, nav)
-  - `system-ink-muted` (#6b7280) — dettagli minori (text-xs, celle tabella)
-  - `system-border` (#e2e4e9) — bordi standard
-  - `system-border-subtle` (#eef0f3) — divisori più leggeri
-  - `system-accent` (#0f6b66) — verde petrolio, invariato
-  - `system-accent-down` (#b34324) — ruggine, per valori in salita
-  - `system-accent-wait` (#9c8a5c) — ambra/ocra desaturata, stato
-    "in_attesa" del modello di freshness a 3 stati (`src/lib/freshness/`).
-    Saturazione/luminosità tarate per restare nella fascia sobria della
-    palette (~26% sat, vicino a `system-ink-muted`), non un ambra
-    "warning" acceso
+  - `system-ink` (#191509) — testo principale
+  - `system-ink-secondary` (#57503f) — testo secondario (paragrafi, nav)
+  - `system-ink-muted` (#8b8371) — dettagli minori (text-xs, celle tabella)
+  - `system-border` (#e4dccb) — bordi standard
+  - `system-border-subtle` (#f0ebe0) — divisori più leggeri
+  - `system-accent` (#8a5a10) — ambra scura: SOLO marca (link, hover,
+    wordmark, timbro), mai significato
+  - `system-signal-up` (#b0461f) — ruggine: valore in salita / sopra media
+  - `system-signal-down` (#3f6f4a) — verde bosco: in discesa / sotto media
+  - `system-signal-wait` (#8a6f28) — ocra spento, stato "in_attesa" del
+    modello di freshness a 3 stati (`src/lib/freshness/`). Tono neutro e
+    non un ambra "warning" acceso: comunica "in attesa del prossimo dato",
+    non un problema
+  - `system-chrome` (#14110c) / `system-chrome-raised` (#1c1811) — fondo
+    del chrome e strato sollevato sopra di esso (la fascia sintetica). La
+    differenza è volutamente minima: deve leggersi come uno strato, non
+    come un blocco diverso
+  - `system-chrome-ink` (#efe7d8) / `system-chrome-ink-muted` (#9a8f7c) /
+    `system-chrome-border` (#2c2519) — inchiostri e bordi sul chrome
+  - `system-chrome-accent` (#e8a33d) — l'ambra sul fondo scuro
+  - `system-chrome-signal-up` (#ef8a5a) / `system-chrome-signal-down`
+    (#6fcf9a) — i due segnali schiariti per il fondo scuro
+
+  I token rimossi il 3 set 2026: `system-accent-down` e
+  `system-accent-wait` (diventati `system-signal-up`/`-wait`). Se trovi
+  ancora un riferimento in una pagina o in un commento, è un residuo.
 
   Eccezione voluta: i colori SVG grezzi dentro `EuropeFuelMap.tsx` (fill dei
   paesi senza dati, stroke dei confini) restano hex letterali perché sono
@@ -285,9 +352,22 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   `FuelImpactCalculator.tsx` (mancava del tutto) e `FuelPriceTable.tsx`
   (esisteva già ma copriva solo il "perché" dell'anteprima compressa, non
   ricerca/ordinamento — vedi sotto). Nessun'altra criticità trovata:
-  naming dei componenti coerente, `SystemCard`/`StatusLabel` ancora usati
-  come documentato, nessuna spaziatura arbitraria oltre a quella già nota
-  sul wordmark header.
+  naming dei componenti coerente, `SystemCard` ancora usato come
+  documentato, nessuna spaziatura arbitraria oltre a quella già nota sul
+  wordmark header. (`StatusLabel`, citato qui prima, è stato rimosso col
+  restyling del 3 set 2026: lo sostituisce `TickerBand`.)
+- **Animazioni**: si anima SOLO a partire da uno stato già visibile — mai
+  `opacity: 0` in attesa di uno scroll o di un IntersectionObserver. Chi
+  arriva con JS lento, chi ha le animazioni disattivate e il primo
+  fotogramma catturato dai social devono vedere la pagina già leggibile.
+  Le tre animazioni esistenti (`animate-scan-in` sulle celle della fascia,
+  `animate-caret` sul cursore dell'occhiello, `animate-draw` sulla curva
+  dell'hero) sono CSS pure, dichiarate in `globals.css`: nessun Client
+  Component, nessun rischio di hydration mismatch, zero KB di bundle. Sono
+  tutte azzerate dentro `@media (prefers-reduced-motion: reduce)` — non
+  rallentate, TOLTE, portando ogni elemento allo stato finale. Niente GIF
+  né immagini decorative: se serve movimento o texture, si generano dai
+  dati (vedi `HeroBackdrop`).
 - Font numeri: sempre `font-mono tabular-nums` per allineamento colonne
 - Ogni sezione dati ha una nota "Fonte: ..." sotto (componente
   `SourceNote`) — non rimuoverle, è il principio cardine del progetto
@@ -378,7 +458,7 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
 
 ## Cosa manca / prossimi passi naturali
 
-Direzione di fondo (brief di allineamento): Prezzario deve diventare un
+Direzione di fondo (brief di allineamento): Mercuriale deve diventare un
 "osservatorio aperto dei prezzi" — quanto costa, da dove viene il dato,
 quanto è aggiornato, com'è rispetto al contesto, come sta cambiando.
 Rafforzare il principio fonte/data/limiti, non diluirlo con funzioni

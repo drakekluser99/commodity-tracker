@@ -1,8 +1,13 @@
-# Prezzario
+# Mercuriale
 
 Progetto open source di tracciamento prezzi di materie prime globali e
 carburanti al consumo: ogni dato con la sua fonte, la sua data e i suoi limiti
 dichiarati esplicitamente.
+
+Il nome viene dal *mercuriale*, il listino ufficiale dei prezzi all'ingrosso
+che le Camere di Commercio pubblicavano periodicamente: la stessa cosa che
+fa questo sito, con fonti diverse. (Il repository resta `commodity-tracker`,
+come i nomi di file e le variabili interne.)
 
 **Sito live:** https://commodity-tracker-one-delta.vercel.app
 

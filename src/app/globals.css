@@ -1,96 +1,239 @@
 @import "tailwindcss";
 
 :root {
-  /* Prezzario è light-only per scelta (palette chiara, stile open-data).
+  /* Mercuriale è light-only per scelta nelle sezioni DATI (palette chiara,
+     stile open-data). Il "chrome" del sito (header, fascia sintetica,
+     footer) è invece scuro per scelta: vedi il blocco @theme sotto.
      `color-scheme: light` lo dichiara esplicitamente così anche i controlli
-     nativi (input, scrollbar) restano chiari sui browser in dark mode. */
+     nativi (input, scrollbar) restano chiari sui browser in dark mode —
+     tutti gli input del sito vivono nelle sezioni chiare. */
   color-scheme: light;
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8f5ee;
+  --foreground: #191509;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-plex-sans);
+  --font-mono: var(--font-plex-mono);
 }
 
 /*
- * Palette "system-style": restyling estetico bianco/nero ispirato a un
- * portfolio minimale con card dagli angoli a mirino (corner bracket).
+ * ============================================================
+ * PALETTE "CRT AMBRA" — restyling di settembre 2026
+ * ============================================================
  *
- * Perché qui e non in un tailwind.config.ts: questo progetto usa Tailwind
- * v4, che NON ha più il file di config JS/TS — i token di tema si
- * dichiarano come custom property dentro @theme in questo CSS. Ogni
- * `--color-system-*` genera automaticamente le utility `bg-system-*`,
- * `text-system-*`, `border-system-*`.
+ * Schema: CHROME SCURO + DATI CHIARI.
  *
- * Perché affiancata e non sostitutiva: i vecchi colori (usati come valori
- * arbitrari `[#f7f8fa]` sparsi nei componenti) restano validi. Migriamo
- * gradualmente sezione per sezione, senza un big-bang che rischia
- * regressioni visive difficili da revisionare.
+ *   - Il "chrome" (header, fascia sintetica dei valori, barra di
+ *     navigazione, footer) è bruno scuro con accento ambra: è la cornice
+ *     del sito, quella che dà carattere e si vede in due secondi.
+ *   - I "dati" (tabelle, mappa, grafici, calcolatore) restano su fondo
+ *     avorio chiaro: sono contenuto che si legge a lungo, e il testo
+ *     scuro su fondo chiaro resta più riposante per la lettura estesa di
+ *     numeri in colonna.
  *
- * `accent` = stesso verde petrolio già in uso (#0f6b66): continuità di
- * brand. `accent-down` = ruggine invece del rosso semaforico da app di
- * trading, per restare nel tema "materie prime / terra". `accent-wait`
- * = ambra/ocra, terzo colore semantico per il modello di freshness a 3
- * stati (aggiornato/in_attesa/non_aggiornato — vedi src/lib/freshness):
- * stessa famiglia "terra" di accent-down ma un tono caldo neutro, non
- * un allarme — comunica "in attesa del prossimo dato", non un problema.
+ * Perché ambra e non il verde petrolio precedente: il sito si chiama
+ * Mercuriale (il nome storico italiano del listino ufficiale dei prezzi
+ * all'ingrosso) e la fonte principale è un "Bollettino". L'ambra su bruno
+ * è il colore dei terminali a fosforo ambra e della carta invecchiata:
+ * dice "bollettino ufficiale" e "terminale" nello stesso segno. Il verde
+ * fosforo avrebbe detto solo "terminale".
+ *
+ * Perché i token stanno qui e non in un tailwind.config.ts: questo
+ * progetto usa Tailwind v4, che NON ha più il file di config JS/TS — i
+ * token di tema si dichiarano come custom property dentro @theme in
+ * questo CSS. Ogni `--color-system-*` genera automaticamente le utility
+ * `bg-system-*`, `text-system-*`, `border-system-*`.
+ *
+ * ------------------------------------------------------------
+ * SEPARAZIONE IMPORTANTE: accento di marca ≠ colori di segnale
+ * ------------------------------------------------------------
+ * Prima di questo restyling `system-accent` faceva due lavori insieme:
+ * era il colore del marchio E il colore di "prezzo in discesa". Con un
+ * accento verde funzionava per caso (verde = giù, ruggine = su). Con
+ * l'ambra no: ambra e ruggine sono vicini, e "in salita"/"in discesa"
+ * sarebbero diventati indistinguibili in un colpo d'occhio.
+ *
+ * Quindi ora sono due famiglie separate:
+ *   `system-accent`      → marca: link, hover, wordmark, timbro
+ *   `system-signal-up`   → prezzo IN SALITA / sopra la media (ruggine)
+ *   `system-signal-down` → prezzo IN DISCESA / sotto la media (verde bosco)
+ * Un colore semantico non deve mai coincidere con l'accento estetico:
+ * se un giorno cambiamo marchio, il significato dei numeri non cambia.
  */
 @theme {
-  --color-system-bg: #fafafa;
-  --color-system-panel: #f2f3f5;
+  /* --- superfici chiare (sezioni dati) --- */
+  --color-system-bg: #f8f5ee;
+  --color-system-panel: #f0ebe0;
   /*
-   * `system-surface` (#ffffff) — sfondo di una card/pannello SOLLEVATO
-   * sopra `system-bg` (header, footer, tabelle, tooltip, dropdown, input
-   * di ricerca): sempre accoppiato a un bordo o un'ombra che lo separa
-   * dalla pagina. Diverso da `system-panel`, che non è "sollevato" ma
-   * uno sfondo secondario piatto nello stesso piano della pagina (es.
-   * hover di riga). Prima di questo token il ruolo esisteva già in tutto
-   * il sito come `bg-white` ripetuto — bianco puro, non un token della
-   * palette `system-*`.
+   * `system-surface` (#fffdf8) — sfondo di una card/pannello SOLLEVATO
+   * sopra `system-bg`: sempre accoppiato a un bordo che lo separa dalla
+   * pagina. Non è bianco puro ma avorio: il bianco puro accanto al bruno
+   * del chrome sembrerebbe "bucato". Diverso da `system-panel`, che non è
+   * sollevato ma uno sfondo secondario piatto nello stesso piano della
+   * pagina (es. hover di riga).
    */
-  --color-system-surface: #ffffff;
-  --color-system-ink: #111318;
+  --color-system-surface: #fffdf8;
+
+  /* --- inchiostri (due livelli gerarchici, vanno tenuti separati) --- */
+  --color-system-ink: #191509;
+  /*   `ink-secondary` — testo di lettura: paragrafi, descrizioni, link.
+   *   `ink-muted`     — dettagli marginali: text-xs, unità, celle
+   *                     secondarie. Deve restare in secondo piano. */
+  --color-system-ink-secondary: #57503f;
+  --color-system-ink-muted: #8b8371;
+
+  /* --- bordi (idem, due livelli) --- */
+  --color-system-border: #e4dccb;
+  --color-system-border-subtle: #f0ebe0;
+  --color-system-border-strong: #191509;
+
+  /* --- chrome scuro (header, fascia, nav, footer) --- */
   /*
-   * Due grigi per il testo, non uno solo: il progetto distingue due
-   * livelli gerarchici e vanno tenuti separati.
-   *   `ink-secondary` (#5b6472) — testo "di lettura": paragrafi,
-   *      descrizioni, link di navigazione. Serve contrasto sufficiente
-   *      per leggere frasi intere.
-   *   `ink-muted` (già presente) — dettagli marginali: text-xs, unità
-   *      di misura, celle di tabella secondarie. Più chiaro, deve
-   *      restare in secondo piano.
-   * Unificarli appiattirebbe la gerarchia visiva, quindi serve il
-   * token dedicato in più.
+   * Due livelli anche qui: `chrome` è il fondo, `chrome-raised` è la
+   * fascia dei valori che ci sta sopra. La differenza è volutamente
+   * minima (8 punti di luminosità): deve leggersi come uno strato, non
+   * come un blocco diverso.
    */
-  --color-system-ink-secondary: #5b6472;
-  --color-system-ink-muted: #6b7280;
-  --color-system-border: #e2e4e9;
+  --color-system-chrome: #14110c;
+  --color-system-chrome-raised: #1c1811;
+  --color-system-chrome-ink: #efe7d8;
+  --color-system-chrome-ink-muted: #9a8f7c;
+  --color-system-chrome-border: #2c2519;
   /*
-   * Stesso ragionamento sui bordi, due livelli distinti:
-   *   `border` (già presente) — bordo "strutturale" di card e tabelle.
-   *   `border-subtle` (#eef0f3) — divisori interni più leggeri (righe
-   *      di tabella, separatori di sezione) che non devono competere
-   *      col contorno del contenitore.
+   * Due ambre, non una: lo stesso colore non può funzionare su entrambi i
+   * fondi. `accent` (#8a5a10) è tarato per il CONTRASTO SU AVORIO (circa
+   * 6.5:1, sopra la soglia AA per il testo normale); `chrome-accent`
+   * (#e8a33d) è tarato per il contrasto SU BRUNO SCURO. Usare il primo
+   * sul fondo scuro darebbe testo illeggibile, il secondo sul chiaro
+   * pure. Sono lo stesso colore percettivo a due luminosità diverse.
    */
-  --color-system-border-subtle: #eef0f3;
-  --color-system-border-strong: #111318;
-  --color-system-accent: #0f6b66;
-  --color-system-accent-down: #b34324;
-  --color-system-accent-wait: #9c8a5c;
+  --color-system-accent: #8a5a10;
+  --color-system-chrome-accent: #e8a33d;
+
+  /* --- colori di segnale (significato, non estetica) --- */
+  --color-system-signal-up: #b0461f;
+  --color-system-signal-down: #3f6f4a;
+  /*
+   * `signal-wait` — terzo colore semantico per il modello di freshness a
+   * 3 stati (aggiornato / in_attesa / non_aggiornato, vedi
+   * src/lib/freshness). Ocra spento: stessa famiglia calda degli altri
+   * due ma tono neutro, non un allarme — comunica "in attesa del prossimo
+   * dato", non un problema.
+   */
+  --color-system-signal-wait: #8a6f28;
+  /*
+   * Stessa storia delle due ambre: i colori di segnale tarati per il
+   * fondo avorio sono troppo scuri sul bruno del chrome (la ruggine
+   * #b0461f su #1c1811 dà circa 2.3:1, sotto ogni soglia di leggibilità).
+   * Queste sono le versioni schiarite, per la fascia sintetica e per
+   * qualsiasi altro segnale che finisca sul fondo scuro.
+   */
+  --color-system-chrome-signal-up: #ef8a5a;
+  --color-system-chrome-signal-down: #6fcf9a;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  /* Geist Sans (caricato in layout.tsx come `--font-geist-sans`) come font
-     di interfaccia. Prima qui c'era `Arial, Helvetica` letterale, che
-     vinceva su Geist: il font importato non veniva mai usato per il testo
-     del body. Geist Mono resta per prezzi/date/unità via l'utility
-     `font-mono`. */
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
+  /* IBM Plex Sans (caricato in layout.tsx come `--font-plex-sans`) come
+     font di interfaccia, IBM Plex Mono per prezzi/date/unità via
+     l'utility `font-mono`. Perché Plex e non Geist: Plex è nato come
+     typeface istituzionale con Sans e Mono disegnati insieme, quindi le
+     cifre della tabella e il testo che le descrive hanno la stessa
+     larghezza percettiva e lo stesso "colore" tipografico in pagina —
+     esattamente ciò che serve a un sito fatto di numeri in colonna. */
+  font-family: var(--font-plex-sans), ui-sans-serif, system-ui, -apple-system,
     sans-serif;
+}
+
+/*
+ * ============================================================
+ * ANIMAZIONI
+ * ============================================================
+ *
+ * Regola che seguiamo ovunque: si anima SOLO a partire da uno stato già
+ * visibile. Niente `opacity: 0` in attesa di uno scroll o di un
+ * IntersectionObserver — chi arriva con JS lento, chi ha le animazioni
+ * disattivate, e il primo fotogramma catturato dai social devono vedere
+ * la pagina già leggibile. Qui si anima quindi solo la SATURAZIONE
+ * dell'ingresso, mai la presenza dell'elemento.
+ *
+ * Sono tutte CSS pure, senza JavaScript: non servono componenti client,
+ * non c'è rischio di hydration mismatch, e costano zero KB di bundle.
+ */
+
+/* Ingresso "a scansione" delle celle della fascia sintetica: partono al
+   65% di opacità e leggermente spostate, arrivano a piena resa. Lo
+   sfalsamento fra le celle è dato inline con animation-delay. */
+@keyframes system-scan-in {
+  from {
+    opacity: 0.65;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-scan-in {
+  animation: system-scan-in 0.5s ease-out both;
+}
+
+/* Cursore del terminale accanto all'occhiello dell'header. `steps(1)`
+   invece di un ease: un cursore vero lampeggia netto, non sfuma. */
+@keyframes system-caret {
+  50% {
+    opacity: 0;
+  }
+}
+
+.animate-caret {
+  animation: system-caret 1.1s steps(1) infinite;
+}
+
+/*
+ * Traccia dell'hero: la curva del Brent disegnata dietro il wordmark si
+ * "scrive" da sinistra a destra al caricamento, come un pennino su carta.
+ * `stroke-dasharray` pari alla lunghezza del percorso + `stroke-dashoffset`
+ * che va a zero è la tecnica standard per animare un tracciato SVG. Il
+ * valore 2000 è una lunghezza abbondante: qualsiasi eccedenza resta fuori
+ * dal tracciato e non si vede.
+ *
+ * Qui l'eccezione alla regola "mai da invisibile" è accettabile perché
+ * l'elemento è puramente decorativo (opacità 12%, aria-hidden): se non
+ * parte, non manca nessuna informazione.
+ */
+@keyframes system-draw {
+  from {
+    stroke-dashoffset: 2000;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-draw {
+  stroke-dasharray: 2000;
+  animation: system-draw 2.4s ease-out both;
+}
+
+/*
+ * Rispetto delle preferenze di sistema. Non "riduciamo" le animazioni:
+ * le togliamo del tutto e portiamo ogni elemento al suo stato finale.
+ * Chi imposta questa preferenza spesso lo fa per disturbi vestibolari o
+ * per emicrania: una versione "più lenta" non risolve il problema.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .animate-scan-in,
+  .animate-caret,
+  .animate-draw {
+    animation: none;
+  }
+  .animate-draw {
+    stroke-dasharray: none;
+  }
 }

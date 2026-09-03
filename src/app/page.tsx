@@ -21,7 +21,8 @@ import { FuelPriceTable } from "@/components/FuelPriceTable";
 import { DownloadDataButtons } from "@/components/DownloadDataButtons";
 import { PriceHistoryChart } from "@/components/PriceHistoryChart";
 import { ProvenanceStamp } from "@/components/ProvenanceStamp";
-import { StatusLabel } from "@/components/StatusLabel";
+import { HeroBackdrop } from "@/components/HeroBackdrop";
+import { TickerBand, type TickerStat } from "@/components/TickerBand";
 import Link from "next/link";
 import {
   Code2,
@@ -51,6 +52,25 @@ const CONTINENT_LABELS: Record<string, string> = {
   north_america: "Nord America",
   oceania: "Oceania",
   latam: "America Latina",
+};
+
+/**
+ * Da quale fonte arriva ciascun continente, per poterne calcolare la
+ * freschezza. `LatestFuelPrice` (src/lib/db/queries.ts) non porta il campo
+ * `source` come fa `LatestCommodityPrice`: i carburanti sono identificati
+ * dalla regione, e la fonte si deduce dal continente.
+ *
+ * Mappa ESPLICITA e non esaustiva di proposito: `getFreshnessConfig`
+ * lancia un errore su una fonte sconosciuta (scelta voluta, vedi
+ * src/lib/freshness/compute.ts). Un continente non elencato qui viene
+ * semplicemente escluso dal conteggio delle fonti in linea, invece di far
+ * saltare l'intera homepage. Se un domani aggiungiamo Oceania o LatAm,
+ * basta aggiungere la riga qui e la voce corrispondente in
+ * FRESHNESS_CONFIG.
+ */
+const CONTINENT_SOURCES: Record<string, string> = {
+  europe: "eu_weekly_oil_bulletin",
+  north_america: "eia_us",
 };
 
 function formatDate(date: Date): string {
@@ -226,65 +246,185 @@ export default async function Home() {
       ? new Date(Math.max(...allTimestamps.map((d) => d.getTime())))
       : null;
 
+  // Serie della curva disegnata in filigrana dietro il wordmark
+  // (src/components/HeroBackdrop.tsx). Il Brent perché è la materia prima
+  // più riconoscibile e l'unica con cadenza davvero giornaliera: la curva
+  // ha abbastanza punti da avere una forma. Se la serie manca (primo
+  // deploy, o cron non ancora girato) HeroBackdrop non disegna nulla.
+  const heroSeries =
+    commoditySeries.find((s) => s.key === "BRENT")?.points ?? [];
+
+  /**
+   * Variazione percentuale di una serie nella sua finestra, per la riga di
+   * contesto sotto i valori della fascia. Riusa `priceMovers`, che salta
+   * già le serie con meno di 2 punti e quelle con primo valore 0.
+   */
+  function seriesChangePct(
+    series: typeof commoditySeries,
+    key: string
+  ): number | null {
+    const found = priceMovers(series).find((m) => m.key === key);
+    return found ? found.changePct : null;
+  }
+
+  /**
+   * Quante fonti stanno pubblicando come previsto, sul totale di quelle
+   * configurate. Non è una lettura di `fetch_runs` (quella dice se il
+   * nostro cron è partito): dice se il DATO è arrivato, che è ciò che
+   * interessa a chi legge. Una fonte è "in linea" se almeno una delle sue
+   * serie è nello stato `aggiornato`.
+   *
+   * Espone in cima al sito il modello di freshness a 3 stati che finora
+   * viveva solo come badge dentro la tabella delle materie prime.
+   */
+  const sourceStates = new Map<string, boolean>();
+  for (const c of commodityRows) {
+    const ok = sourceStates.get(c.source) ?? false;
+    sourceStates.set(c.source, ok || c.freshnessState === "aggiornato");
+  }
+  for (const [continent, fuels] of fuelsByContinent.entries()) {
+    const source = CONTINENT_SOURCES[continent];
+    if (!source) continue; // continente senza fonte mappata: fuori dal conteggio
+    const mostRecent = new Date(
+      Math.max(...fuels.map((f) => f.recordedAt.getTime()))
+    );
+    const state = computeFreshness(mostRecent, getFreshnessConfig(source), now);
+    const ok = sourceStates.get(source) ?? false;
+    sourceStates.set(source, ok || state === "aggiornato");
+  }
+  const sourcesOnline = Array.from(sourceStates.values()).filter(Boolean).length;
+  const sourcesTotal = sourceStates.size;
+
   // Fascia sintetica header (punto 25 del brief): valori derivati da dati
   // già recuperati sopra, nessuna nuova query. "n/d" quando la fonte non
   // ha ancora pubblicato nulla (es. subito dopo il primo deploy).
   const brent = commodityRows.find((c) => c.symbol === "BRENT") ?? null;
-  const headerStats = [
+  const brentChange = seriesChangePct(commoditySeries, "BRENT");
+  const petrolChange = seriesChangePct(fuelSeries, "europe|petrol");
+  const dieselChange = seriesChangePct(fuelSeries, "europe|diesel");
+
+  /** Riga di contesto "variazione + finestra", o niente se non calcolabile. */
+  function changeNote(pct: number | null, windowDays: number) {
+    if (pct === null) return {};
+    return {
+      note: `${formatPercent(pct)} · ${windowDays}gg`,
+      noteTone: (pct >= 0 ? "up" : "down") as "up" | "down",
+    };
+  }
+
+  const headerStats: TickerStat[] = [
     {
       key: "brent",
-      label: "BRENT",
-      value: brent
-        ? `${formatCommodityPrice(parseFloat(brent.displayPrice))} ${shortUnit(brent.displayUnit)}`
-        : "n/d",
+      label: "Brent",
+      value: brent ? formatCommodityPrice(parseFloat(brent.displayPrice)) : "n/d",
+      unit: brent ? shortUnit(brent.displayUnit) : undefined,
+      ...changeNote(brentChange, 90),
     },
     {
       key: "benzina",
-      label: "BENZINA UE",
+      label: "Benzina UE",
       value:
         europeAverage.petrol !== null
-          ? `${formatFuelPrice(europeAverage.petrol)} ${currencySymbol(europeAverage.currency)}/L`
+          ? formatFuelPrice(europeAverage.petrol)
           : "n/d",
+      unit:
+        europeAverage.petrol !== null
+          ? `${currencySymbol(europeAverage.currency)}/L`
+          : undefined,
+      ...changeNote(petrolChange, 30),
     },
     {
       key: "diesel",
-      label: "DIESEL UE",
+      label: "Diesel UE",
       value:
         europeAverage.diesel !== null
-          ? `${formatFuelPrice(europeAverage.diesel)} ${currencySymbol(europeAverage.currency)}/L`
+          ? formatFuelPrice(europeAverage.diesel)
           : "n/d",
+      unit:
+        europeAverage.diesel !== null
+          ? `${currencySymbol(europeAverage.currency)}/L`
+          : undefined,
+      ...changeNote(dieselChange, 30),
     },
     {
       key: "ultimo-dato",
-      label: "ULTIMO DATO",
+      label: "Ultimo dato",
       value: lastUpdated ? formatDateTime(lastUpdated) : "n/d",
+      note: "Materie prime: ogni giorno",
+    },
+    {
+      key: "fonti",
+      label: "Fonti in linea",
+      value: sourcesTotal > 0 ? `${sourcesOnline} / ${sourcesTotal}` : "n/d",
+      note: "Carburanti: settimanale",
     },
   ];
 
   return (
     <div className="min-h-screen bg-system-bg text-system-ink">
-      <header className="border-b border-system-border bg-system-surface">
-        <div className="mx-auto max-w-7xl px-6 py-10">
+      {/* ============================================================
+          CHROME SCURO (header)
+          ============================================================
+          Lo schema del restyling è "chrome scuro + dati chiari": questa
+          è la cornice, le sezioni sotto restano su avorio. Il senso è
+          pratico, non solo estetico — una tabella di numeri si legge
+          meglio scura su chiaro, mentre l'intestazione ha il compito
+          opposto: farsi riconoscere in due secondi.
+
+          `relative` + `overflow-hidden` servono a HeroBackdrop, che è in
+          posizione assoluta e va ritagliato ai bordi dell'header. */}
+      <header className="relative overflow-hidden bg-system-chrome text-system-chrome-ink">
+        {/* La curva reale del Brent a 90 giorni, in filigrana dietro il
+            wordmark. Non è un'immagine: è il dato. Vedi la motivazione
+            estesa in src/components/HeroBackdrop.tsx. */}
+        {/* Nascosto sotto `sm`: il viewBox si deforma per riempire il
+            contenitore (preserveAspectRatio="none"), e su uno schermo
+            stretto e alto la curva diventa una montagna verticale che
+            compete col wordmark invece di stargli dietro. */}
+        <HeroBackdrop points={heroSeries} className="hidden sm:block" />
+
+        {/* `relative` su questo contenitore (e non solo z-index) mette il
+            contenuto sopra l'SVG di sfondo senza creare stacking context
+            inutili. */}
+        <div className="relative mx-auto max-w-7xl px-6 pb-8 pt-10">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              {/* Wordmark (punto 17 del brief): "Prezzario" come elemento
+              {/* Wordmark (punto 17 del brief): il nome come elemento
                   visivo dominante. Resta un <p>, non un heading — l'h1
                   vero è la riga sotto, che descrive il CONTENUTO della
                   pagina (rilevante per SEO/accessibilità); il nome del
-                  prodotto da solo non porta segnale tematico. */}
-              <div className="flex items-center gap-2.5">
-                <ProvenanceStamp size={36} className="shrink-0 text-system-accent" />
-                <p className="text-4xl font-bold tracking-tight text-system-ink sm:text-5xl">
-                  Prezzario
+                  prodotto da solo non porta segnale tematico.
+
+                  `uppercase` + tracking largo: "mercuriale" era il nome
+                  dei listini ufficiali dei prezzi all'ingrosso pubblicati
+                  dalle Camere di Commercio, e il maiuscolo spaziato è la
+                  loro composizione tipica. Il maiuscolo è puramente
+                  presentazionale, il testo nel DOM resta capitalizzato. */}
+              <div className="flex items-center gap-3">
+                <ProvenanceStamp
+                  size={38}
+                  className="shrink-0 text-system-chrome-accent"
+                />
+                <p className="text-[30px] font-semibold uppercase tracking-[0.03em] text-system-chrome-ink sm:text-4xl sm:tracking-[0.06em] lg:text-5xl">
+                  Mercuriale
                 </p>
               </div>
-              <p className="mt-1 ml-[46px] text-xs font-semibold uppercase tracking-[0.14em] text-system-accent">
-                Progetto open source
+              <p className="mt-1.5 ml-[50px] font-mono text-[11px] uppercase tracking-[0.18em] text-system-chrome-accent">
+                Osservatorio aperto · dati pubblici
+                {/* Cursore del terminale: `aria-hidden` perché per uno
+                    screen reader è rumore, e `select-none` perché non
+                    deve finire in un copia-incolla del titolo. */}
+                <span
+                  aria-hidden="true"
+                  className="animate-caret ml-1 inline-block select-none"
+                >
+                  _
+                </span>
               </p>
-              <h1 className="mt-4 text-lg font-medium text-system-ink sm:text-xl">
+              <h1 className="mt-5 text-lg font-medium text-system-chrome-ink sm:text-xl">
                 Prezzi di materie prime e carburanti
               </h1>
-              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-system-ink-secondary">
+              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-system-chrome-ink-muted">
                 Dati raccolti da fonti pubbliche: Alpha Vantage per le materie
                 prime globali, la Commissione Europea e l&apos;EIA per i
                 carburanti al consumo. Aggiornati automaticamente alla cadenza
@@ -296,9 +436,9 @@ export default async function Home() {
                 href={GITHUB_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hidden items-center gap-2 rounded-md border border-system-border px-3 py-2 text-sm font-medium text-system-ink-secondary transition-colors hover:border-system-accent hover:text-system-accent sm:flex"
+                className="hidden items-center gap-2 rounded-md border border-system-chrome-border px-3 py-2 font-mono text-xs uppercase tracking-wider text-system-chrome-ink-muted transition-colors hover:border-system-chrome-accent hover:text-system-chrome-accent sm:flex"
               >
-                <Code2 size={16} />
+                <Code2 size={15} />
                 Codice sorgente
               </a>
               <MobileNav
@@ -311,59 +451,42 @@ export default async function Home() {
               />
             </div>
           </div>
-
-          {lastUpdated && (
-            // Fascia sintetica (punto 25 del brief): 4 indicatori assoluti
-            // di apertura — nessun delta/trend qui, quelli vivono già in
-            // "Maggiori variazioni" più sotto. Riusa StatusLabel in serie
-            // invece di un componente nuovo; stesso pattern di divisori
-            // border-l già usato per le colonne del footer, attivo solo da
-            // `lg` in su (sotto, un border-l cadrebbe a metà di righe che
-            // vanno a capo — stesso motivo già documentato lì).
-            <div className="mt-4">
-              <div className="grid grid-cols-2 gap-x-6 gap-y-3 lg:flex lg:items-center lg:gap-0">
-                {headerStats.map(({ key, label, value }, i) => (
-                  <div
-                    key={key}
-                    className={
-                      i === 0
-                        ? "lg:pr-6"
-                        : "lg:border-l lg:border-system-border-subtle lg:px-6"
-                    }
-                  >
-                    <StatusLabel label={label} value={value} />
-                  </div>
-                ))}
-              </div>
-              {/* Contesto sulla cadenza: non tutto si aggiorna alla stessa
-                  velocità, e dirlo qui in alto evita che l'utente lo scopra
-                  solo scorrendo fino alle note "Fonte:". */}
-              <p className="mt-2 text-xs text-system-ink-muted">
-                Materie prime: ogni giorno · Carburanti: settimanale
-              </p>
-            </div>
-          )}
-
-          {/* Barra di navigazione "tab bar": un solo contenitore con bordo
-              unico e divisori verticali (border-l) fra le voci, invece di
-              pillole separate da spazio vuoto. `overflow-hidden` sul
-              contenitore ritaglia gli angoli arrotondati delle voci agli
-              estremi; `first:border-l-0` toglie il divisore iniziale. */}
-          <nav className="mt-6 hidden border-t border-system-border-subtle pt-4 sm:block">
-            <div className="inline-flex overflow-hidden rounded-md border border-system-border">
-              {NAV_ITEMS.map(({ href, label, icon: Icon }) => (
-                <a
-                  key={href}
-                  href={href}
-                  className="flex items-center gap-1.5 border-l border-system-border px-3.5 py-2 font-mono text-xs uppercase tracking-wider text-system-ink-secondary transition-colors first:border-l-0 hover:bg-system-bg hover:text-system-accent"
-                >
-                  <Icon size={14} />
-                  {label}
-                </a>
-              ))}
-            </div>
-          </nav>
         </div>
+
+        {/* Fascia sintetica (punto 25 del brief): valori assoluti di
+            apertura, nessun ranking — le classifiche vivono in "Maggiori
+            variazioni". Vedi src/components/TickerBand.tsx. */}
+        {lastUpdated && <TickerBand stats={headerStats} />}
+
+        {/* Barra di navigazione a piena larghezza sul chrome: divisori
+            verticali fra le voci e sottolineatura in ambra sull'hover,
+            invece di pillole separate da spazio vuoto. */}
+        <nav className="relative hidden border-b border-system-chrome-border sm:block">
+          <div className="mx-auto flex max-w-7xl">
+            {NAV_ITEMS.map(({ href, label, icon: Icon }) => (
+              <a
+                key={href}
+                href={href}
+                className="flex items-center gap-1.5 border-b-2 border-l border-transparent border-l-system-chrome-border px-5 py-3 font-mono text-[11px] uppercase tracking-[0.1em] text-system-chrome-ink-muted transition-colors first:border-l-0 hover:border-b-system-chrome-accent hover:bg-white/[0.03] hover:text-system-chrome-accent"
+              >
+                <Icon size={13} />
+                {label}
+              </a>
+            ))}
+            <Link
+              href="/metodologia"
+              className="ml-auto flex items-center border-l border-system-chrome-border px-5 py-3 font-mono text-[11px] uppercase tracking-[0.1em] text-system-chrome-ink-muted transition-colors hover:text-system-chrome-accent"
+            >
+              Metodologia
+            </Link>
+            <Link
+              href="/glossario"
+              className="flex items-center border-l border-system-chrome-border px-5 py-3 font-mono text-[11px] uppercase tracking-[0.1em] text-system-chrome-ink-muted transition-colors hover:text-system-chrome-accent"
+            >
+              Glossario
+            </Link>
+          </div>
+        </nav>
       </header>
 
       <main className="mx-auto max-w-7xl px-6 py-10">
@@ -407,8 +530,8 @@ export default async function Home() {
                       <div
                         className={`flex shrink-0 items-center gap-1 font-mono font-semibold tabular-nums ${
                           up
-                            ? "text-system-accent-down"
-                            : "text-system-accent"
+                            ? "text-system-signal-up"
+                            : "text-system-signal-down"
                         }`}
                       >
                         {up ? (
@@ -477,7 +600,7 @@ export default async function Home() {
             </div>
             {commodityRows.length > 0 && (
               <DownloadDataButtons
-                filenameBase="prezzario-materie-prime"
+                filenameBase="mercuriale-materie-prime"
                 columns={COMMODITY_EXPORT_COLUMNS}
                 rows={commodityExportRows}
               />
@@ -524,8 +647,8 @@ export default async function Home() {
                               title={`Ultimo dato ${c.ageDays} giorni fa. ${c.freshnessLabel}: il valore mostrato potrebbe non essere quello corrente.`}
                               className={
                                 c.freshnessState === "non_aggiornato"
-                                  ? "rounded border border-system-accent-down/40 px-1.5 py-0.5 font-mono text-[10px] uppercase leading-none tracking-wider text-system-accent-down"
-                                  : "rounded border border-system-accent-wait/40 px-1.5 py-0.5 font-mono text-[10px] uppercase leading-none tracking-wider text-system-accent-wait"
+                                  ? "rounded border border-system-signal-up/40 px-1.5 py-0.5 font-mono text-[10px] uppercase leading-none tracking-wider text-system-signal-up"
+                                  : "rounded border border-system-signal-wait/40 px-1.5 py-0.5 font-mono text-[10px] uppercase leading-none tracking-wider text-system-signal-wait"
                               }
                             >
                               {c.freshnessState === "non_aggiornato" ? "non aggiornato" : "in attesa"}
@@ -597,7 +720,11 @@ export default async function Home() {
         </section>
       </main>
 
-      <footer className="mt-8 border-t border-system-border bg-system-surface">
+      {/* Footer sul chrome scuro, come l'header: la pagina è "incorniciata"
+          in alto e in basso dal bruno, e le sezioni dati stanno nel mezzo
+          sull'avorio. Il filo ambra è il segno di chiusura. */}
+      <footer className="mt-12 bg-system-chrome text-system-chrome-ink">
+        <div className="h-0.5 bg-system-chrome-accent/50" />
         <div className="mx-auto max-w-7xl px-6 py-12">
           {/* Colonne del footer separate da divisori verticali (border-l col
               colore bordo del design system) invece che dal solo spazio
@@ -608,18 +735,18 @@ export default async function Home() {
               la linea centrata. */}
           <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4 lg:gap-x-0">
             <div className="lg:pr-8">
-              <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-system-accent">
-                <ProvenanceStamp size={28} className="shrink-0 text-system-accent" />
-                Prezzario
+              <p className="flex items-center gap-1.5 text-xs font-mono uppercase tracking-[0.18em] text-system-chrome-accent">
+                <ProvenanceStamp size={28} className="shrink-0 text-system-chrome-accent" />
+                Mercuriale
               </p>
-              <p className="mt-3 text-xs leading-relaxed text-system-ink-muted">
+              <p className="mt-3 text-xs leading-relaxed text-system-chrome-ink-muted">
                 Progetto open source · dati pubblici, nessuna garanzia di
                 accuratezza
               </p>
             </div>
 
-            <div className="lg:border-l lg:border-system-border lg:pl-8">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-system-ink-secondary">
+            <div className="lg:border-l lg:border-system-chrome-border lg:pl-8">
+              <h3 className="text-xs font-mono uppercase tracking-[0.14em] text-system-chrome-ink-muted">
                 Naviga
               </h3>
               <ul className="mt-3 space-y-2 text-sm">
@@ -627,7 +754,7 @@ export default async function Home() {
                   <li key={href}>
                     <a
                       href={href}
-                      className="text-system-ink-secondary transition-colors hover:text-system-accent"
+                      className="text-system-chrome-ink transition-colors hover:text-system-chrome-accent"
                     >
                       {label}
                     </a>
@@ -636,15 +763,15 @@ export default async function Home() {
               </ul>
             </div>
 
-            <div className="lg:border-l lg:border-system-border lg:pl-8">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-system-ink-secondary">
+            <div className="lg:border-l lg:border-system-chrome-border lg:pl-8">
+              <h3 className="text-xs font-mono uppercase tracking-[0.14em] text-system-chrome-ink-muted">
                 Progetto
               </h3>
               <ul className="mt-3 space-y-2 text-sm">
                 <li>
                   <Link
                     href="/metodologia"
-                    className="text-system-ink-secondary transition-colors hover:text-system-accent"
+                    className="text-system-chrome-ink transition-colors hover:text-system-chrome-accent"
                   >
                     Metodologia
                   </Link>
@@ -652,7 +779,7 @@ export default async function Home() {
                 <li>
                   <Link
                     href="/glossario"
-                    className="text-system-ink-secondary transition-colors hover:text-system-accent"
+                    className="text-system-chrome-ink transition-colors hover:text-system-chrome-accent"
                   >
                     Glossario
                   </Link>
@@ -662,7 +789,7 @@ export default async function Home() {
                     href={GITHUB_URL}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 text-system-ink-secondary transition-colors hover:text-system-accent"
+                    className="inline-flex items-center gap-2 text-system-chrome-ink transition-colors hover:text-system-chrome-accent"
                   >
                     <Code2 size={15} />
                     Codice sorgente
@@ -671,8 +798,8 @@ export default async function Home() {
               </ul>
             </div>
 
-            <div className="lg:border-l lg:border-system-border lg:pl-8">
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-system-ink-secondary">
+            <div className="lg:border-l lg:border-system-chrome-border lg:pl-8">
+              <h3 className="text-xs font-mono uppercase tracking-[0.14em] text-system-chrome-ink-muted">
                 Autore
               </h3>
               <p className="mt-3 text-sm">
@@ -680,7 +807,7 @@ export default async function Home() {
                   href="https://www.linkedin.com/in/yuri-copparini"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-system-ink-secondary transition-colors hover:text-system-accent"
+                  className="inline-flex items-center gap-2 text-system-chrome-ink transition-colors hover:text-system-chrome-accent"
                 >
                   <LinkedinGlyph size={15} />
                   Yuri Copparini

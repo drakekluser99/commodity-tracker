@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ProvenanceStamp } from "@/components/ProvenanceStamp";
 
 export const metadata = {
-  title: "Glossario — Prezzario",
+  title: "Glossario — Mercuriale",
 };
 
 export default function Glossario() {

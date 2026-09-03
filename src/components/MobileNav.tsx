@@ -33,7 +33,11 @@ export default function MobileNav({ items, pageLinks, githubUrl }: Props) {
         onClick={() => setOpen(!open)}
         aria-label={open ? "Chiudi menu" : "Apri menu"}
         aria-expanded={open}
-        className="flex items-center justify-center rounded-md border border-system-border p-2 text-system-ink-secondary transition-colors hover:border-system-accent hover:text-system-accent"
+        /* Il pulsante vive nell'header, che dal restyling di settembre 2026
+           è sul chrome scuro: usa i token `system-chrome-*`. Il pannello a
+           tendina che si apre resta invece chiaro (`system-surface`), come
+           le sezioni dati sotto — è contenuto da leggere, non cornice. */
+        className="flex items-center justify-center rounded-md border border-system-chrome-border p-2 text-system-chrome-ink-muted transition-colors hover:border-system-chrome-accent hover:text-system-chrome-accent"
       >
         {open ? <X size={18} /> : <Menu size={18} />}
       </button>

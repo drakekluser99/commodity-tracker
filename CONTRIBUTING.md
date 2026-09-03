@@ -1,6 +1,6 @@
-# Contribuire a Prezzario
+# Contribuire a Mercuriale
 
-Grazie per l'interesse verso questo progetto. Prezzario è un osservatorio
+Grazie per l'interesse verso questo progetto. Mercuriale è un osservatorio
 aperto dei prezzi di materie prime e carburanti — il principio cardine è che
 ogni dato mostrato deve avere una fonte, una data e dei limiti dichiarati
 esplicitamente. Questo vale anche per il codice che lo alimenta.
