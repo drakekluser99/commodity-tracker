@@ -589,7 +589,9 @@ ponderata, import massivo storico, estrapolazioni causali.
     carburanti scattano davvero da soli su Vercel? In `fetch_runs` non
     c'è ancora nessuna loro esecuzione automatica — solo le due manuali
     del 1 set. Le risposte arrivano da sole: UE giovedì dopo le 12:00
-    UTC, USA lunedì dopo le 18:00 UTC. Fino ad allora la domanda resta
+    UTC, USA lunedì dopo le 18:00 UTC. Da controllare in quella run:
+    `ok: true` e i valori benzina/diesel UE che si aggiornano di
+    conseguenza nella fascia sintetica. Fino ad allora la domanda resta
     senza risposta, e NON va data per risolta
   - **Carburanti USA: nessun guasto in produzione.** La run in tabella
     riporta `ok: false` + `errorText: "EIA_API_KEY non configurata"`, ma
