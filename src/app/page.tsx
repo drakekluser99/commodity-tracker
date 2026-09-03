@@ -20,6 +20,7 @@ import MobileNav from "@/components/MobileNav";
 import { FuelPriceTable } from "@/components/FuelPriceTable";
 import { DownloadDataButtons } from "@/components/DownloadDataButtons";
 import { PriceHistoryChart } from "@/components/PriceHistoryChart";
+import { MercurialeMark } from "@/components/MercurialeMark";
 import { ProvenanceStamp } from "@/components/ProvenanceStamp";
 import { HeroBackdrop } from "@/components/HeroBackdrop";
 import { TickerBand, type TickerStat } from "@/components/TickerBand";
@@ -421,7 +422,7 @@ export default async function Home() {
                   loro composizione tipica. Il maiuscolo è puramente
                   presentazionale, il testo nel DOM resta capitalizzato. */}
               <div className="flex items-center gap-3">
-                <ProvenanceStamp
+                <MercurialeMark
                   size={38}
                   className="shrink-0 text-system-chrome-accent"
                 />
@@ -756,7 +757,7 @@ export default async function Home() {
           <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4 lg:gap-x-0">
             <div className="lg:pr-8">
               <p className="flex items-center gap-1.5 text-xs font-mono uppercase tracking-[0.18em] text-system-chrome-accent">
-                <ProvenanceStamp size={28} className="shrink-0 text-system-chrome-accent" />
+                <MercurialeMark size={28} className="shrink-0 text-system-chrome-accent" />
                 Mercuriale
               </p>
               <p className="mt-3 text-xs leading-relaxed text-system-chrome-ink-muted">
@@ -851,6 +852,14 @@ function SourceNote({ children }: { children: React.ReactNode }) {
   // dove il principio del progetto si concretizza, quindi è dove la firma
   // ha più senso. `items-start` + `mt-0.5` per allinearlo alla prima riga
   // di testo anche quando la nota va a capo.
+  //
+  // Qui NON va il marchio (MercurialeMark), che pure ha preso il posto del
+  // timbro in header e footer. Due ragioni. La prima è di significato: in
+  // header e footer il segno dice "questo sito è Mercuriale", qui dice
+  // "questo numero ha una fonte" — sono due messaggi diversi e un segno solo
+  // per entrambi li confonde. La seconda è di leggibilità: a 14 px i tratti
+  // sottili del marchio collassano, mentre il timbro è disegnato con un
+  // cerchio pieno e una spunta spessa e regge la miniatura.
   return (
     <p className="mt-2 flex items-start gap-1.5 font-mono text-xs uppercase tracking-wider text-system-ink-muted">
       <ProvenanceStamp size={14} className="mt-0.5 shrink-0 text-system-accent" />
