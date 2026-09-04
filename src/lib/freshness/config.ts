@@ -30,4 +30,10 @@ export const FRESHNESS_CONFIG: Record<string, FreshnessConfig> = {
   // giorni copre un possibile ritardo occasionale della fonte.
   eu_weekly_oil_bulletin: { expectedIntervalDays: 7, graceDays: 3, label: 'Bollettino UE (settimanale)' },
   eia_us: { expectedIntervalDays: 7, graceDays: 3, label: 'EIA USA (settimanale)' },
+
+  // MIMIT (Fase 4): il CSV si aggiorna ogni giorno (dato comunicato il
+  // giorno prima). Grace di 2 giorni, più stretto delle fonti settimanali
+  // sopra perché una cadenza giornaliera che salta un giorno è già un
+  // segnale, non un weekend di mercati chiusi.
+  mimit: { expectedIntervalDays: 1, graceDays: 2, label: 'MIMIT (giornaliero)' },
 };

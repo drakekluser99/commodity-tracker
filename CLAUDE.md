@@ -43,12 +43,21 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   precedente come "100% tasse", e dove la fonte non pubblica il netto il
   carico fiscale NON si calcola, non si stima per differenza da una media.
   Solo `eu_weekly_oil_bulletin` la valorizza, l'EIA dà il prezzo alla pompa
-  e basta. `price_history` e
+  e basta. **Fase 3 (4 set 2026)**: due colonne in più, `exciseEur`
+  (accisa, €/L) e `vatRatePercent` (aliquota IVA, %) — stessa logica di
+  `priceNet`: `numeric` nullable, senza default, valorizzate solo da
+  `eu_weekly_oil_bulletin` e non per ogni paese/settimana. L'importo IVA
+  in euro NON si salva: si deriva a valle da `(priceNet + exciseEur) *
+  vatRatePercent / 100` (vedi `europeFuelStats.ts`), così la formula si
+  aggiorna in un solo posto se un giorno cambia. `price_history` e
   `retail_fuel_prices` hanno sia `recorded_at` (data DEL DATO) sia
   `retrieved_at` (quando il fetcher l'ha acquisito, nullable): due cose
   diverse, servono per distinguere "fonte ferma" da "fonte che non ha
-  ancora pubblicato". Migrazioni applicate al DB Neon fino alla `0005`
-  (1 set 2026): `retrieved_at` è `NULL` per le righe salvate prima della
+  ancora pubblicato". Migrazioni applicate al DB Neon fino alla `0009`
+  (4 set 2026: `0006`/`0007` aggiungono `weekly_narratives`, `0008`
+  aggiunge `excise_eur`/`vat_rate_percent`, `0009` aggiunge `provinces` e
+  `retail_fuel_prices_it`, Fase 4). Storico: `retrieved_at` è
+  `NULL` per le righe salvate prima della
   `0004` e si popola dal primo run successivo di ogni cron; `fetch_runs`
   parte vuota e si riempie allo stesso modo. `regions.name` ha un vincolo
   `UNIQUE` (migrazione `0005` — vedi "Errori noti": prima non c'era, e i
@@ -124,7 +133,23 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
     limite, la strada è leggere in streaming invece di caricare in memoria.
     Verificato prima di spedirlo: 12 controlli contro una ricostruzione
     fedele del layout, compresi i valori reali dell'Italia e lo scatto
-    della guardia quando una colonna sparisce
+    della guardia quando una colonna sparisce.
+    **Fase 3 (4 set 2026): scomposizione accisa/IVA.** Il file storico ha
+    anche i fogli `VAT` ed `Excise duties` (ispezionati, `Excise duties -
+    components` e `Other Indirect Taxes` deliberatamente esclusi — vedi
+    "Cosa manca"), diversi in forma dai fogli prezzi: sono A EVENTI (una
+    riga solo quando l'aliquota/accisa CAMBIA, non ogni settimana) e usano
+    celle Excel unite (il codice paese compare solo sulla prima riga del
+    blocco, va "portato avanti" a mano riga per riga). Tre funzioni nuove:
+    `readExchangeRates` (legge `${codice}_exchange_rate` dal foglio prezzi,
+    serve a convertire l'accisa da valuta nazionale a euro per i paesi
+    fuori dall'euro — imprecisione nota e accettata nelle settimane a
+    cavallo di un'adozione dell'euro, il tasso di cambio è solo
+    settimanale), `readTaxEventSheet` (gestisce le celle unite, produce per
+    paese una lista di eventi ordinata per data), `valueAsOf` (lookup
+    "as-of": l'ultimo evento con data ≤ la settimana cercata, `null` se il
+    foglio non copre ancora quel paese in quel periodo — mai un valore
+    indovinato)
   - `euOilBulletin.ts` — **NON più collegato al cron** (3 set 2026). Resta
     perché lo usa `scripts/inspect-eu-bulletin.ts` ed è un parser validato
     che vale come ripiego. Non ricollegarlo senza motivo: perderebbe il
@@ -257,14 +282,74 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
 - `src/app/metodologia/page.tsx` — pagina trasparenza (fonti, limiti,
   frequenza aggiornamento, licenza MIT). Spiega anche il badge "non
   aggiornato" e documenta l'API pubblica `/api/data` (sezione 05, con
-  esempio di risposta). **NON ancora aggiornata (1 set 2026) al modello
-  di freshness a 3 stati**: descrive solo il badge binario di prima,
-  non menziona lo stato `in_attesa` (`system-signal-wait`)
+  esempio di risposta). **Allineata al modello di freshness a 3 stati e
+  a "media dei 27" (Fase 1, 3 set 2026)** — prima descriveva solo il
+  vecchio badge binario
 - `src/app/glossario/page.tsx` — pagina FAQ/glossario (WTI vs Brent,
   Weekly Oil Bulletin, EIA, cadenza giornaliera vs mensile, badge "non
   aggiornato" → rimanda a metodologia). Stesso pattern di
   `metodologia/page.tsx` (helper `Section`, header "torna alla dashboard").
-  Stessa nota: prosa non aggiornata al modello a 3 stati
+  Stessa nota: allineata al modello a 3 stati (Fase 1, 3 set 2026)
+- `src/app/paese/[slug]/page.tsx` (Fase 2, 3 set 2026) — pagina per
+  singolo paese UE (`/paese/italia`, 27 slug generati staticamente da
+  `generateStaticParams`, contenuto letto a ogni richiesta via
+  `force-dynamic` come la home). Mostra prezzo alla pompa, netto, quota
+  fiscale, posizione in classifica (`rankByTaxShare`) e confronto con la
+  media dei 27 — stessa formula della home, non ricalcolata (vedi
+  `europeFuelStats.ts`). Se lo slug è valido ma manca ancora un prezzo per
+  quel paese (es. subito dopo l'aggiunta), mostra una pagina onesta invece
+  di un 404: l'URL è corretto, manca solo il dato.
+  **Scomposizione accisa/IVA (Fase 3, 4 set 2026)**: `FuelStatCard` mostra
+  Accisa/IVA/Altre imposte SOLO quando tutti e tre i valori sono
+  disponibili — un oggetto `breakdown` (non tre variabili sciolte) perché
+  TypeScript lo restringe correttamente dentro `{breakdown && (...)}`,
+  a differenza di un booleano calcolato a parte (bug intercettato prima
+  della consegna, avrebbe fallito `tsc --noEmit`). "Altre imposte" si
+  mostra solo sopra 0,0005 €/L, per non stampare un residuo di
+  arrotondamento come se fosse una voce fiscale reale
+- `src/lib/europeFuelStats.ts` (Fase 2, esteso in Fase 3) —
+  `computeEuropeFuelStats` ricostruisce, dai prezzi europei più recenti,
+  sia il dato per paese sia la media dei 27: prima viveva solo dentro
+  `page.tsx`, estratto perché `/paese/[slug]` lo doveva vedere
+  IDENTICO (stesso arrotondamento, stessa esclusione dei paesi senza
+  netto dalla media). `taxPerLiter`/`taxSharePercent`/`rankByTaxShare`
+  vengono da qui. Fase 3 aggiunge `vatEurPerLiter` (IVA in €/L, calcolata
+  e MAI salvata: base imponibile = netto + accisa, così come si applica
+  per legge nell'UE) e `otherTaxesPerLiter` (residuo = lordo − netto −
+  accisa − IVA, copre "Other Indirect Taxes" e gli scarti di
+  arrotondamento tra fogli — clampato a 0 solo in visualizzazione, mai
+  nei dati salvati)
+- `src/lib/countries.ts` (Fase 2) — `EU_COUNTRY_SLUGS`,
+  `englishNameForSlug`/`routeForCountry`: il ponte fra lo slug URL
+  (`italia`) e la chiave grezza in inglese usata da `regions.name`
+  (`Italy`). Un solo registro, usato sia da `/paese/[slug]` sia dai link
+  della mappa verso le pagine paese
+- `src/lib/sources.ts` + `src/components/SourceNote.tsx` (Fase 2,
+  gerarchia delle fonti, 3 set 2026) — `SOURCES` è il registro unico di
+  fonte → `kind` (`primaria` = ente istituzionale con mandato pubblico,
+  Commissione Europea/EIA; `aggregata` = intermediario commerciale, Alpha
+  Vantage). `SourceNote` (estratto qui da un'implementazione copiata a
+  mano fra homepage e pagina paese) mostra un badge per ogni `kind`
+  presente nelle fonti citate, deduplicato — due fonti primarie nella
+  stessa nota non producono due badge identici. Un solo posto per
+  aggiungere una fonte futura (MIMIT in Fase 4): basta una voce in
+  `SOURCES`, tutto il resto la eredita
+- `src/lib/narrative/generateWeeklyNarrative.ts` +
+  `src/lib/fetchers/saveWeeklyNarrative.ts` (Fase 2, "cosa è cambiato
+  questa settimana", 3 set 2026) — funzione pura (stesso principio di
+  `priceHistory.ts`: niente IO, si testa con dati finti) che confronta due
+  settimane di prezzi carburante UE e genera 2-3 frasi narrative: benzina
+  e diesel in Italia (sempre, se c'è una variazione) più il paese con lo
+  scostamento maggiore sulla benzina fra gli altri 26. Scompone la
+  variazione in prodotto/tassa quando entrambe le settimane hanno il
+  netto ("il diesel è salito di 3 centesimi, tutti di prodotto, zero di
+  tassa") — non un'altra tabella di percentuali, che esiste già come
+  "Maggiori variazioni" in home. Le righe si ARCHIVIANO in
+  `weekly_narratives` (non si ricalcolano a ogni richiesta): una
+  dichiarazione fatta in un momento preciso non deve cambiare sotto i
+  piedi di chi l'ha già letta se un dato storico viene corretto in
+  seguito. Generate dal cron `fetch-eu-fuel-prices` dopo il salvataggio
+  dei prezzi, upsert su `(week_of, kind)`
 - `src/components/MercurialeMark.tsx` (3 set 2026) — il marchio del
   progetto: due assi con i terminali a T e una stella a quattro punte
   nell'incrocio (un dato su un grafico). Componente React inline e non
@@ -329,9 +414,11 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   fiscale). Sono due DIMENSIONI, non quattro chip in fila — con quattro
   voci il lettore deve ricostruire da sé che sono assi incrociati. `unit` e
   `format` vivono in `MEASURES` perché sono ciò che distingue una misura
-  dall'altra (tre decimali e "€/L" contro uno e "%"). Una terza misura — la
-  sola accisa, dai fogli fiscali del file storico — sarebbe una voce in più
-  lì dentro: il registro è nato per questo e ha già pagato una volta.
+  dall'altra (tre decimali e "€/L" contro uno e "%"). **Terza misura
+  "Accisa" aggiunta in Fase 3 (4 set 2026)**: una voce in più in
+  `MEASURES`, dai fogli fiscali del file storico (`petrolExciseEur`/
+  `dieselExciseEur`) — esattamente il caso per cui il registro era nato,
+  ha pagato la seconda volta senza toccare il resto del componente.
   Il centro della scala per la quota fiscale è la **quota della media**
   `(media pompa − media netto) / media pompa`, NON la media delle quote dei
   27: rispondono a domande diverse e sui dati veri differiscono di quasi
@@ -423,7 +510,20 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   stesso principio di `getFreshnessConfig`, mai un default silenzioso
   Dal 3 set 2026 c'è anche il target **`eu-fuel`**: un solo download da
   4,3 MB copre 27 paesi, due carburanti, tutte le settimane, con prezzo
-  alla pompa E netto. Default a 10 anni anche qui (~28.000 righe).
+  alla pompa E netto. Default a 10 anni anche qui.
+  **Rilancio Fase 3 (4 set 2026)**, dopo l'aggiunta di `excise_eur`/
+  `vat_rate_percent` allo schema: 27.374 rilevazioni (2016-09-05 →
+  2026-08-31, 507 settimane), tutte e 27.374 con prezzo netto, accisa e
+  aliquota IVA valorizzati. Il backfill NON si lancia da solo dopo una
+  migrazione — il cron settimanale aggiorna solo l'ultima settimana, lo
+  storico già salvato resta con le colonne nuove a `NULL` finché non lo si
+  rilancia a mano
+- `scripts/inspect-eu-history-taxes.ts` (Fase 3, 4 set 2026) — ispezione
+  di sola lettura dei 4 fogli del file storico mai letti prima (`VAT`,
+  `Excise duties`, `Excise duties - components`, `Other Indirect Taxes`).
+  Script separato da `inspect-eu-history.ts` (che guarda solo i primi 3
+  fogli prezzi/netto/consumi) perché all'inizio VAT/Excise sembravano
+  assenti — non lo erano, semplicemente nessuno script li apriva
 - `scripts/inspect-eu-history.ts` (3 set 2026) — ispeziona il file
   STORICO del bollettino UE ("Price developments 2005 onwards", ~4,3 MB),
   diverso da quello settimanale usato in `euOilBulletin.ts`. Contiene i
@@ -684,6 +784,18 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   (3 set 2026: mezz'ora persa a guardare l'URL di produzione aspettando
   modifiche che erano ferme sul branch). Tre livelli distinti: `commit` →
   `localhost:3000`, `push` → URL Preview, merge in `main` → produzione.
+- **Terza modalità di lavoro (Cowork, 4 set 2026)**: Claude guida l'utente
+  a distanza sul suo PC via bridge device — legge/scrive file, ma NON ha
+  una shell diretta su quella macchina (niente `device_bash` in questa
+  configurazione): i comandi vanno incollati dall'utente in PowerShell e
+  l'output torna qui per la verifica. `gh` CLI NON è installato sul PC
+  dell'utente: per controllare lo stato di una PR si usa il browser
+  (in-app o dell'utente) su `github.com/drakekluser99/commodity-tracker`,
+  non `gh pr status`. Prima di assumere che una modifica descritta in un
+  riepilogo di sessione precedente sia "ancora da fare", verificare con
+  `git log --oneline` e lo stato reale della PR: in questa sessione tutta
+  la Fase 3 risultava già committata e già mergiata quando è iniziata,
+  nonostante il riepilogo la descrivesse come lavoro in sospeso.
 
 ## Cosa manca / prossimi passi naturali
 
@@ -703,21 +815,29 @@ ponderata, import massivo storico, estrapolazioni causali.
   commodity prima del fix), e wirare il badge nella tabella/mappa
   carburanti — la config `FRESHNESS_CONFIG` in `config.ts` ha già le
   entry `eu_weekly_oil_bulletin`/`eia_us` pronte, manca solo l'uso
-- **Prosa metodologia/glossario da allineare al modello a 3 stati**:
-  `metodologia/page.tsx` e `glossario/page.tsx` spiegano ancora solo il
-  vecchio badge binario "non aggiornato", non menzionano `in_attesa` —
-  scollamento introdotto dal fix di freshness (1 set 2026), non ancora
-  richiuso
+- **Prosa metodologia/glossario allineata al modello a 3 stati — FATTO**
+  (Fase 1, 3 set 2026): `metodologia/page.tsx` e `glossario/page.tsx`
+  menzionano ora anche `in_attesa`, non solo il vecchio badge binario
 - **Pagina pubblica "Stato dei dati"**: modello dati pronto
   (`fetch_runs`), pagina da costruire (ultimo tentativo / ultimo
   successo / ultimo dato / errore recente per fonte)
-- **Registro correzioni**: quando una fonte ripubblica un valore
-  DIVERSO per la stessa data, oggi l'`onConflictDoUpdate` lo sovrascrive
-  e la vecchia versione sparisce. Serve un upsert CONDIZIONALE (nuova
-  riga solo se il valore differisce dall'ultimo salvato) — richiede di
-  toccare il vincolo unique `(commodity_id, recorded_at)`, il tie-break
-  di `getLatest*` e il dedup nello storico: va progettato a parte, NON
-  con un insert puro (reintrodurrebbe il bug dei duplicati)
+- **Registro correzioni** (Fase 3, ancora da fare): quando una fonte
+  ripubblica un valore DIVERSO per la stessa data, oggi
+  l'`onConflictDoUpdate` lo sovrascrive e la vecchia versione sparisce.
+  Serve un upsert CONDIZIONALE (nuova riga solo se il valore differisce
+  dall'ultimo salvato) — richiede di toccare il vincolo unique
+  `(commodity_id, recorded_at)`, il tie-break di `getLatest*` e il dedup
+  nello storico: va progettato a parte, NON con un insert puro
+  (reintrodurrebbe il bug dei duplicati). Va di pari passo con
+  `latest_recorded_at` in `fetch_runs`, sotto
+- **"Numero del giorno" da fonte annuale** (Fase 3, idea dall'analisi
+  competitor, ancora da fare): una riga tipo "le accise sui carburanti
+  valgono X miliardi di euro l'anno", sourced al rapporto MEF/Agenzia
+  delle Dogane più recente, aggiornata una volta l'anno — NON calcolata
+  dal cron settimanale, che non ha il volume di litri venduti per farlo
+  onestamente. Va marcata con la data della fonte, altrimenti si ripete
+  l'errore trovato nei siti concorrenti: un numero statico spacciato per
+  vivo
 - **Localizzazione nomi paese — FATTO (2 set 2026)** per tabella
   carburanti e tooltip mappa. `src/lib/countryNames.ts`
   (`COUNTRY_NAMES_IT` + `localizedCountryName`, fallback esplicito al
@@ -737,19 +857,116 @@ ponderata, import massivo storico, estrapolazioni causali.
   carburante/100km camion) per EU vs USA. Nessun confronto "vs mese
   scorso", nessuna deviazione dalla media (quella esiste solo nel
   tooltip della mappa, `EuropeFuelMap.tsx`, non nel calcolatore)
-- **Gerarchia fonti non visibile** (brief punto 12, verificato
-  1 set 2026): `SourceNote` tratta Alpha Vantage (intermediario
-  commerciale) e Commissione Europea/EIA (enti istituzionali primari)
-  con lo stesso identico stile in tutti e 4 i punti d'uso in `page.tsx`.
-  Stesso in `metodologia/page.tsx`: le 3 fonti sono nello stesso
-  `SourceItem`, nessun raggruppamento/badge — solo un accenno nella
-  prosa delle descrizioni, non una gerarchia strutturata
+- **Gerarchia fonti — FATTO** (Fase 2, 3 set 2026): `src/lib/sources.ts`
+  (registro `SOURCES`, fonte → `primaria`/`aggregata`) + `SourceNote.tsx`
+  mostrano un badge per `kind` accanto a ogni nota "Fonte:", deduplicato.
+  Resta un accenno nella sola prosa di `metodologia/page.tsx` (non un
+  badge), non ancora verificato se vale la pena strutturarlo anche lì
 - **API v1 / permalink / "Carta del prezzo" / widget / citazioni** —
   visione a lungo termine del brief, tutto dipendente da metadati e
   freshness stabili. Non prima. `/api/data` attuale è provvisorio
-- **MIMIT** (prezzi distributori italiani): dataset enorme, richiede un
-  modello di regione GERARCHICO (oggi `regions` è piatto) + retention +
-  tabelle dedicate. Progetto separato con la sua fase di design
+- **MIMIT (Fase 4, ricerca preliminare fatta il 4 set 2026)** — dati
+  prezzi carburanti stazione-per-stazione, pubblicati OGNI GIORNO (con
+  dato alle 8 del mattino precedente) su
+  `mimit.gov.it/it/open-data/elenco-dataset/carburanti-prezzi-praticati-e-anagrafica-degli-impianti`,
+  licenza IODL 2.0. Due CSV separati, separatore `|` (cambiato da virgola
+  il 10 febbraio 2026, per evitare conflitti coi separatori dentro i
+  campi):
+  - `anagrafica_impianti_attivi.csv` — anagrafica: `idImpianto`, `Gestore`,
+    `Bandiera` (marchio o "pompe bianche"), `Tipo Impianto`
+    (Autostradale/Stradale), `Nome Impianto`, `Indirizzo`, `Comune`,
+    `Provincia`, `Latitudine`/`Longitudine` (autodichiarate dal gestore,
+    non verificate)
+  - `prezzo_alle_8.csv` — prezzi: `idimpianto` (FK verso l'anagrafica),
+    `descCarburante`, `prezzo` (3 decimali), `isSelf` (0/1, servito vs
+    self-service — stesso distributore può avere due prezzi), `dtComu`
+    (timestamp di comunicazione del gestore, non "le 8 di mattina" per
+    ogni riga nonostante il nome del file)
+  **Volume MISURATO il 4 set 2026** (scaricando i file per intero dal PC
+  dell'utente, non stimato): 23.981 impianti attivi, 93.068 righe prezzo
+  nell'estrazione del giorno — che salvate una per una farebbero ~34
+  milioni di righe/anno, contro le ~28.000 di dieci anni di storico UE.
+  **Decisione presa**: aggregazione per PROVINCIA (107, non i ~7.900
+  comuni — troppo pochi impianti a comune, ~3 in media, per una media
+  onesta) calcolata a livello di cron, riga per stazione mai salvata.
+  Modello dati: tabella `provinces` SEPARATA da `regions` (non una
+  gerarchia sulla tabella esistente — vedi schema.ts sopra), self e
+  servito su due colonne distinte (in Italia il self costa quasi sempre
+  meno, una media dei due sarebbe un prezzo che nessuno paga davvero).
+  **Nota tecnica**: `mimit.gov.it` non è raggiungibile dalla rete del
+  container cloud di Claude (egress bloccato per policy) — il download va
+  fatto dal PC dell'utente o, più avanti, da un cron Vercel.
+  **Scritto E VERIFICATO contro il file reale (4 set 2026)**:
+  - `src/lib/provinces.ts` — le 107 province ISTAT, sigla → nome → slug,
+    stessa impostazione manuale di `countries.ts`. Confermate tutte e 107
+    le sigle reali del CSV, zero sconosciute dopo il fix sotto
+  - `src/lib/db/schema.ts` — tabelle `provinces` (anagrafica minima,
+    sigla+nome) e `retail_fuel_prices_it` (medie giornaliere per
+    provincia×carburante×self/servito, con conteggio impianti per
+    trasparenza sul campione) — migrazione `0009` generata e applicata
+  - `src/lib/fetchers/mimit.ts` — `fetchAndAggregateMimit()`: scarica i
+    due CSV, decodifica UTF-8 con fallback Windows-1252 (verificato:
+    questo file è in UTF-8 vero, "CITTÀ SANT'ANGELO" arriva senza
+    corruzione — il fallback resta per sicurezza, non ancora scattato),
+    salta le due righe di intestazione (`Estrazione del...` + header
+    colonne), filtra a `benzina`/`gasolio` standard (57 varianti
+    brandizzate/altri carburanti scartate correttamente, es. "Blue
+    Diesel", "HVOlution", GPL, Metano) e aggrega per
+    provincia×carburante×self/servito.
+    **Bug intercettato e corretto al primo lancio reale**: Provincia
+    NON si legge da un indice fisso (colonna 7) — alcune righe
+    dell'anagrafica hanno un numero di campi diverso da 10 (indirizzi o
+    nomi impianto con un `|` residuo, nonostante il cambio di separatore
+    di febbraio 2026), e un indice fisso dall'inizio leggeva un pezzo di
+    indirizzo o il nome del Comune al posto della sigla su quelle righe
+    (60 sigle sconosciute, 113 impianti scartati, 426 righe prezzo
+    "orfane" al primo giro). Corretto leggendo Provincia/Latitudine/
+    Longitudine dal FONDO della riga (`row[row.length - 3]` ecc.): sono
+    sempre le ultime tre colonne qualunque cosa succeda prima. Dopo il
+    fix: 23.981/23.981 impianti riconosciuti, 0 sigle sconosciute, 0
+    righe orfane, 428/428 combinazioni provincia×carburante×self/servito
+    possibili tutte presenti — il campione più pulito di qualunque fonte
+    finora integrata
+  - `src/lib/fetchers/saveMimitPrices.ts` — upsert su `provinces` (tutte e
+    107, sempre) poi su `retail_fuel_prices_it` a blocchi da 500. Primo
+    salvataggio reale: **214 righe** (107 province × 2 carburanti, self e
+    servito nella stessa riga come da schema)
+  - `scripts/inspect-mimit.ts` — `npx tsx scripts/inspect-mimit.ts`
+    (contatori, nessuna scrittura) / `--save` (scrive). Il flusso
+    dry-run-poi-save ha trovato il bug sopra PRIMA che toccasse il
+    database — esattamente il motivo per cui esiste in due modalità
+  **`/provincia/[slug]` — FATTO (Cowork, 4 set 2026)**: pagina per singola
+  provincia (`/provincia/milano`, 107 slug generati staticamente da
+  `generateStaticParams`, contenuto letto a ogni richiesta via
+  `force-dynamic`, stesso pattern di `/paese/[slug]`). Mostra self,
+  servito, differenza fra i due, media nazionale e posizione in classifica
+  fra le 107 — non la scomposizione fiscale: l'accisa è uguale in tutta
+  Italia, ripeterla per provincia non direbbe niente di nuovo, e la pagina
+  lo dice esplicitamente con un link a `/paese/italia`. Se lo slug è valido
+  ma manca ancora un prezzo, mostra una pagina onesta invece di un 404,
+  stesso principio di `/paese/[slug]`.
+  `src/lib/italianFuelStats.ts` (nuovo file, non un'estensione di
+  `europeFuelStats.ts`: le due fonti danno dati di forma diversa — MIMIT
+  non ha un prezzo netto da cui sottrarre) — `computeItalianFuelStats`
+  ricostruisce il dato per provincia e la media nazionale; **la media è
+  PESATA sul numero di impianti di ciascuna provincia**, a differenza della
+  media "semplice" dei 27 paesi UE: lì non abbiamo i consumi reali per
+  pesarla, qui invece il conteggio impianti è un dato che già salviamo
+  (trasparenza sul campione), quindi ignorarlo come peso sarebbe stato lo
+  scarto meno onesto, non il più semplice. `rankByPrice` usa la stessa
+  convenzione di `rankByTaxShare` (rank 1 = valore più alto, qui il prezzo
+  più caro). `src/lib/db/queries.ts` ha una nuova
+  `getLatestItalianFuelPrices()` (stesso pattern di dedup di
+  `getLatestFuelPrices`, su chiave provincia+carburante). `src/lib/sources.ts`
+  ha una nuova voce `mimit` (`kind: "primaria"` — ente pubblico con mandato
+  di legge, stessa categoria di Commissione Europea/EIA) e
+  `src/lib/freshness/config.ts` una entry `mimit` (1 giorno atteso, 2 di
+  grace — più stretta delle fonti settimanali perché una cadenza
+  giornaliera che salta un giorno è già un segnale).
+  **Ancora da fare**: un vero cron schedulato (oggi è uno script manuale,
+  coerente con "non prima di uno sprint libero" della roadmap) e un link
+  verso le pagine provincia da qualche punto della UI (oggi si raggiungono
+  solo digitando l'URL — nessuna mappa o tabella le collega ancora)
 - **Scomposizione fiscale — FATTA** (3 set 2026), ed è il contenuto che
   differenzia il sito. Il numero, sui dati del 31 agosto: dei 177 millesimi
   che l'Italia paga sopra la media dei 27, **155 sono imposte e 22 sono il
@@ -759,6 +976,11 @@ ponderata, import massivo storico, estrapolazioni causali.
   Malta 56,3% (ma è la più economica alla pompa), Svezia 29,6%.
   Nessuno di questi è una stima: sono sottrazioni fra due colonne dello
   stesso file, ripetibili ogni settimana per 27 paesi.
+  **Estesa in Fase 3 (4 set 2026)**: il totale "di cui imposte" si scompone
+  ora in Accisa/IVA/Altre imposte (vedi `europeFuelStats.ts` e i bullet
+  sopra su `paese/[slug]/page.tsx` ed `euOilBulletinHistory.ts`).
+  Verificato in produzione lo stesso 4 set: benzina in Italia 2,017 €/L,
+  netto 0,980, imposte 1,037 = accisa 0,673 + IVA 0,364 (somma esatta).
 - **DUE MEDIE UE DIVERSE — da sistemare.** Il file contiene le medie
   calcolate dalla Commissione (colonne `EU_`), che NON coincidono con le
   nostre: 1,950 €/L contro 1,840 sui dati del 31 agosto, **110 millesimi**.
@@ -766,8 +988,8 @@ ponderata, import massivo storico, estrapolazioni causali.
   la loro è ponderata sui consumi. Con la loro, l'Italia è +67 e non +177.
   Nessuna delle due è sbagliata — rispondono a domande diverse — ma il sito
   ne mostra una e deve dire quale: le etichette ora dicono "media dei 27"
-  invece di "media UE" (mappa fatta; **metodologia e glossario da
-  allineare**).
+  invece di "media UE" (mappa, metodologia e glossario allineati —
+  **FATTO, Fase 1, 3 set 2026**).
   Per mostrare ANCHE la ponderata servirebbe salvare la riga aggregata
   `EU_`, e lì c'è un problema di modello: finirebbe in `regions` come se
   fosse un paese, comparirebbe nella tabella carburanti e verrebbe
@@ -775,11 +997,14 @@ ponderata, import massivo storico, estrapolazioni causali.
   `regions.kind` ('country' | 'aggregate') e quindi un'altra migrazione. È
   il passo giusto ma è un passo suo — NON aggiungere `EU_` a `regions`
   senza quella colonna.
-- **Fogli fiscali non ancora usati**: il file storico ha anche `VAT`,
-  `Excise duties`, `Excise duties - components`, `Other Indirect Taxes`.
-  Servirebbero a separare DENTRO le imposte quanto è accisa e quanto IVA —
-  oggi il sito mostra il totale. Sarebbe una terza voce nel registro
-  `MEASURES` della mappa. Struttura di quei fogli mai ispezionata.
+- **Fogli fiscali (VAT/Excise) — FATTO** (Fase 3, 4 set 2026): `VAT` ed
+  `Excise duties` sono ora letti (`euOilBulletinHistory.ts`), la
+  scomposizione accisa/IVA è in produzione su `/paese/[slug]` e come
+  terza misura sulla mappa. `Excise duties - components` (scomposizione
+  dell'accisa in sotto-voci) e `Other Indirect Taxes` restano
+  deliberatamente esclusi — il loro effetto resta comunque visibile come
+  residuo "Altre imposte" (lordo − netto − accisa − IVA), senza doverli
+  leggere riga per riga
 - **Storico: sbloccato** (3 set 2026). Prima c'erano 2 rilevazioni per
   serie — le variazioni si calcolavano su due punti e `HeroBackdrop` si
   rifiutava di disegnare (soglia: 8 rilevazioni). Ora `price_history` ha

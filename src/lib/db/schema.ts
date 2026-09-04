@@ -217,3 +217,80 @@ export const weeklyNarratives = pgTable(
     weekOfIdx: index("weekly_narratives_week_of_idx").on(table.weekOf),
   })
 );
+
+/**
+ * PROVINCES
+ * Fase 4 (ricerca preliminare 4 set 2026, ricerca completata più avanti).
+ * Le 107 province italiane — tabella SEPARATA da `regions` e non
+ * un'estensione gerarchica di essa: `regions` è già in produzione (pagine
+ * paese UE, EuropeFuelMap), e farla gerarchica ora avrebbe voluto dire
+ * toccare codice che oggi funziona per una feature che non lo tocca ancora.
+ * Anagrafica minima: MIMIT dà solo la sigla nella colonna `Provincia`
+ * dell'anagrafica impianti, non il nome per esteso (vedi
+ * `src/lib/provinces.ts`, che la sigla la porta a un nome e uno slug URL —
+ * quella tabella scritta a mano è la fonte del nome, questa riga sul DB
+ * serve solo da bersaglio di chiave esterna per i prezzi).
+ */
+export const provinces = pgTable("provinces", {
+  id: serial("id").primaryKey(),
+  code: varchar("code", { length: 2 }).notNull().unique(), // sigla, es. "MI"
+  name: text("name").notNull(), // es. "Milano" — da src/lib/provinces.ts
+});
+
+/**
+ * RETAIL_FUEL_PRICES_IT
+ * Prezzi carburanti per PROVINCIA, aggregati dal cron a partire dal CSV
+ * stazione-per-stazione del MIMIT (23.981 impianti attivi, ~93.000 righe
+ * prezzo/giorno misurate il 4 set 2026 — vedi CLAUDE.md). Tabella
+ * SEPARATA da `retail_fuel_prices` (che resta il dato UE/USA, per PAESE):
+ * unità di misura diversa (provincia vs paese), fonte diversa, e soprattutto
+ * granularità diversa — mescolarle in una tabella sola avrebbe richiesto
+ * far finta che "provincia" e "paese" fossero la stessa colonna `region_id`.
+ *
+ * Deliberatamente NON una riga per stazione: 93.000 righe/giorno
+ * salvate per sempre farebbero ~34 milioni di righe l'anno, contro le
+ * ~28.000 di dieci anni di storico UE. Il cron scarica il CSV stazione per
+ * stazione, aggrega per (provincia, carburante, self/servito) e scarta il
+ * dettaglio — la riga per stazione non sopravvive oltre l'esecuzione del
+ * cron. Se un giorno servisse il dettaglio (es. una mappa di densità), è
+ * una scelta ESPLICITA da riprendere, non un default silenzioso.
+ */
+export const retailFuelPricesIt = pgTable(
+  "retail_fuel_prices_it",
+  {
+    id: serial("id").primaryKey(),
+    provinceId: integer("province_id")
+      .notNull()
+      .references(() => provinces.id),
+    fuelType: varchar("fuel_type", { length: 32 }).notNull(), // "petrol" | "diesel" — solo i due standard, non le varianti brandizzate (vedi mimit.ts)
+    // Self e servito sono colonne SEPARATE e non una media unica: in
+    // Italia il self è quasi sempre più economico di alcuni centesimi,
+    // media insieme sarebbe un numero che non corrisponde al prezzo che
+    // paga né chi fa self né chi si fa servire. Nullable: una provincia
+    // può non avere impianti con servito attivo quel giorno.
+    priceSelfAvg: numeric("price_self_avg", { precision: 10, scale: 4 }),
+    priceServedAvg: numeric("price_served_avg", { precision: 10, scale: 4 }),
+    // Quanti impianti hanno contribuito a ciascuna media — trasparenza sul
+    // campione, stesso principio del "fonte, data, limiti" del progetto:
+    // una media su 2 impianti non è la stessa cosa di una su 200, e la
+    // pagina deve poterlo dire.
+    selfStationCount: integer("self_station_count"),
+    servedStationCount: integer("served_station_count"),
+    currency: varchar("currency", { length: 3 }).notNull().default("EUR"),
+    unit: varchar("unit", { length: 16 }).notNull().default("liter"),
+    recordedAt: timestamp("recorded_at").notNull(), // data dell'estrazione MIMIT ("Estrazione del ..."), non oggi
+    retrievedAt: timestamp("retrieved_at"),
+    source: varchar("source", { length: 64 }).notNull().default("mimit"),
+  },
+  (table) => ({
+    provinceDateIdx: index("retail_fuel_it_province_date_idx").on(
+      table.provinceId,
+      table.recordedAt
+    ),
+    // Bersaglio dell'upsert: una sola riga per (provincia, carburante,
+    // data), stesso pattern di retail_fuel_prices e price_history.
+    provinceFuelRecordedUnique: uniqueIndex(
+      "retail_fuel_it_province_fuel_recorded_at_unique"
+    ).on(table.provinceId, table.fuelType, table.recordedAt),
+  })
+);
