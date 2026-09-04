@@ -9,7 +9,7 @@ import {
   type DataCorrectionRow,
 } from "@/lib/db/queries";
 import { computeFreshness, getFreshnessConfig } from "@/lib/freshness/compute";
-import { formatCommodityPrice, formatFuelPrice } from "@/lib/format";
+import { formatCommodityPrice, formatFuelPrice, formatDateTime } from "@/lib/format";
 
 export const metadata = {
   title: "Stato dei dati — Mercuriale",
@@ -369,19 +369,6 @@ function formatCorrectionValue(
   return tableName === "retail_fuel_prices"
     ? formatFuelPrice(value)
     : formatCommodityPrice(value);
-}
-
-/** Data + ora it-IT (es. "04/09/2026, 14:32") — più precisa di formatDate
- *  (solo giorno) perché su questa pagina l'ORARIO di un run conta: due
- *  esecuzioni nello stesso giorno vanno distinguibili. */
-function formatDateTime(date: Date): string {
-  return new Intl.DateTimeFormat("it-IT", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
 }
 
 function Section({

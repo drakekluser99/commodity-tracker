@@ -108,3 +108,19 @@ export function formatDate(date: Date): string {
     year: "numeric",
   }).format(date);
 }
+
+/**
+ * Data + ora it-IT (es. "04/09/2026, 14:32"). Come `formatDate`, esisteva
+ * come tre copie identiche (page.tsx, stato-dati/page.tsx) prima di finire
+ * qui — serve ovunque un timestamp di ESECUZIONE (non solo il giorno del
+ * dato) conta: due run nello stesso giorno vanno distinguibili.
+ */
+export function formatDateTime(date: Date): string {
+  return new Intl.DateTimeFormat("it-IT", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}

@@ -5,6 +5,7 @@ import {
   getFuelPriceHistory,
   getLatestWeeklyNarratives,
   getLatestItalianFuelPrices,
+  getLatestFetchRuns,
 } from "@/lib/db/queries";
 import { groupCommodityHistory, groupFuelHistory, priceMovers } from "@/lib/priceHistory";
 import { displayCommodityPrice } from "@/lib/commodityDisplay";
@@ -15,6 +16,7 @@ import {
   shortUnit,
   currencySymbol,
   formatBillionsEur,
+  formatDateTime,
 } from "@/lib/format";
 import { ANNUAL_FIGURE } from "@/lib/annualFigures";
 import { computeFreshness, getFreshnessConfig } from "@/lib/freshness/compute";
@@ -90,16 +92,6 @@ function formatDate(date: Date): string {
   }).format(date);
 }
 
-function formatDateTime(date: Date): string {
-  return new Intl.DateTimeFormat("it-IT", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
-
 // Colonne dell'export della tabella materie prime. Le chiavi diventano
 // le colonne del CSV e i campi del JSON; l'ordine qui è l'ordine nel file.
 const COMMODITY_EXPORT_COLUMNS = [
@@ -147,6 +139,7 @@ export default async function Home() {
     fuelHistory,
     weeklyNarrative,
     italianFuelPrices,
+    fetchRuns,
   ] = await Promise.all([
     getLatestCommodityPrices(),
     getLatestFuelPrices(),
@@ -154,8 +147,21 @@ export default async function Home() {
     getFuelPriceHistory(fuelHistorySince),
     getLatestWeeklyNarratives(),
     getLatestItalianFuelPrices(),
+    getLatestFetchRuns(),
   ]);
   const commoditySeries = groupCommodityHistory(commodityHistory);
+
+  // Ultima esecuzione registrata per i due cron a cadenza singola e
+  // affidabile (carburanti UE/USA) — la stessa domanda a cui risponde
+  // /stato-dati, riusata qui per mostrarla accanto al dato invece che solo
+  // in una pagina a parte (vedi brainstorm 4 set 2026, punto 1). Alpha
+  // Vantage resta escluso di proposito: mescola commodity a cadenza
+  // diversa nello stesso job, quindi un "ultimo controllo" unico
+  // nasconderebbe la serie più lenta — stessa ragione per cui
+  // /stato-dati non gli calcola un badge di freschezza (vedi
+  // SOURCE_LEVEL_FRESHNESS in quel file).
+  const euFuelRun = fetchRuns.find((r) => r.job === "fetch-eu-fuel-prices");
+  const usFuelRun = fetchRuns.find((r) => r.job === "fetch-us-fuel-prices");
 
   // Timestamp unico per il calcolo di freschezza di tutte le righe (vedi
   // src/lib/freshness/compute.ts). Server Component force-dynamic,
@@ -579,7 +585,12 @@ export default async function Home() {
                 </li>
               ))}
             </ul>
-            <SourceNote sources={["eu-commission"]}>
+            <SourceNote
+              sources={["eu-commission"]}
+              checks={[
+                { label: "UE", cadence: "ogni giovedì", checkedAt: euFuelRun?.startedAt ?? null },
+              ]}
+            >
               Fonte: Bollettino Petrolifero Settimanale, Commissione Europea ·
               confronto tra le due rilevazioni settimanali più recenti
             </SourceNote>
@@ -724,7 +735,12 @@ export default async function Home() {
                 }}
               />
             </div>
-            <SourceNote sources={["eu-commission"]}>
+            <SourceNote
+              sources={["eu-commission"]}
+              checks={[
+                { label: "UE", cadence: "ogni giovedì", checkedAt: euFuelRun?.startedAt ?? null },
+              ]}
+            >
               Fonte: Bollettino Petrolifero Settimanale, Commissione Europea ·
               Aggiornamento: ogni giovedì · Confini amministrativi: Natural
               Earth (dominio pubblico)
@@ -869,7 +885,13 @@ export default async function Home() {
               series={fuelSeries}
             />
           </div>
-          <SourceNote sources={["eu-commission", "eia"]}>
+          <SourceNote
+            sources={["eu-commission", "eia"]}
+            checks={[
+              { label: "UE", cadence: "ogni giovedì", checkedAt: euFuelRun?.startedAt ?? null },
+              { label: "USA", cadence: "ogni lunedì", checkedAt: usFuelRun?.startedAt ?? null },
+            ]}
+          >
             Fonte: Bollettino Petrolifero Settimanale (UE, ogni giovedì) ·
             EIA (USA, ogni lunedì) · Prezzi medi nazionali, non punti vendita
             specifici

@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { getLatestFuelPrices } from "@/lib/db/queries";
+import { getLatestFuelPrices, getLatestFetchRuns } from "@/lib/db/queries";
 import {
   computeEuropeFuelStats,
   taxPerLiter,
@@ -66,7 +66,14 @@ export default async function CountryPage({ params }: PageProps) {
   if (!englishName) notFound();
 
   const italianName = localizedCountryName(englishName);
-  const fuelPrices = await getLatestFuelPrices();
+  const [fuelPrices, fetchRuns] = await Promise.all([
+    getLatestFuelPrices(),
+    getLatestFetchRuns(),
+  ]);
+  // Stesso riuso della home (vedi SourceNote/page.tsx): l'ultima esecuzione
+  // registrata del cron UE, mostrata accanto al dato invece che solo su
+  // /stato-dati.
+  const euFuelRun = fetchRuns.find((r) => r.job === "fetch-eu-fuel-prices");
   const { countries, average } = computeEuropeFuelStats(fuelPrices);
   const country = countries.find((c) => c.countryName === englishName);
 
@@ -267,7 +274,12 @@ export default async function CountryPage({ params }: PageProps) {
           </p>
         </SystemCard>
 
-        <SourceNote sources={["eu-commission"]}>
+        <SourceNote
+          sources={["eu-commission"]}
+          checks={[
+            { label: "UE", cadence: "ogni giovedì", checkedAt: euFuelRun?.startedAt ?? null },
+          ]}
+        >
           Fonte: Bollettino Petrolifero Settimanale, Commissione Europea ·
           Ultima rilevazione:{" "}
           {country.recordedAt ? formatDate(country.recordedAt) : "—"}
