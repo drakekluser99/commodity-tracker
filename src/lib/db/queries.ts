@@ -8,6 +8,8 @@ import {
   weeklyNarratives,
   provinces,
   retailFuelPricesIt,
+  fetchRuns,
+  dataCorrections,
 } from "./schema";
 
 export interface LatestCommodityPrice {
@@ -312,4 +314,89 @@ export async function getLatestItalianFuelPrices(): Promise<
     latest.push(row);
   }
   return latest;
+}
+
+export interface FetchRunSummary {
+  source: string;
+  job: string;
+  startedAt: Date;
+  finishedAt: Date | null;
+  ok: boolean | null;
+  pointsSaved: number | null;
+  latestRecordedAt: Date | null;
+  errorText: string | null;
+}
+
+/**
+ * L'ultima esecuzione registrata per ogni JOB (non per fonte: una fonte
+ * come "alpha_vantage" ha 5 job distinti, uno per batch di commodity — vedi
+ * runMarketPriceCron.ts). Risponde alla domanda "questa pipeline sta
+ * girando?", diversa da "questo dato è fresco?" (quella la risponde già
+ * ogni card della homepage con computeFreshness).
+ *
+ * Stessa logica di dedup delle altre getLatest* di questo file: si legge
+ * tutto ordinato dal più recente e si tiene solo la prima occorrenza per
+ * job, che essendo l'array ordinato è per forza la più recente.
+ */
+export async function getLatestFetchRuns(): Promise<FetchRunSummary[]> {
+  const rows = await db
+    .select({
+      source: fetchRuns.source,
+      job: fetchRuns.job,
+      startedAt: fetchRuns.startedAt,
+      finishedAt: fetchRuns.finishedAt,
+      ok: fetchRuns.ok,
+      pointsSaved: fetchRuns.pointsSaved,
+      latestRecordedAt: fetchRuns.latestRecordedAt,
+      errorText: fetchRuns.errorText,
+    })
+    .from(fetchRuns)
+    .orderBy(desc(fetchRuns.startedAt));
+
+  const seen = new Set<string>();
+  const latest: FetchRunSummary[] = [];
+  for (const row of rows) {
+    if (seen.has(row.job)) continue;
+    seen.add(row.job);
+    latest.push(row);
+  }
+  return latest;
+}
+
+export interface DataCorrectionRow {
+  tableName: string;
+  entityLabel: string;
+  field: string;
+  oldValue: string;
+  newValue: string;
+  recordedAt: Date;
+  detectedAt: Date;
+  source: string;
+}
+
+/**
+ * Le correzioni più recenti registrate in `data_corrections` (Fase 3),
+ * dalla più recente per `detectedAt` (il momento in cui ce ne siamo
+ * accorti, non la data del dato corretto — vedi schema.ts). `limit` di
+ * default basso: questa è una pagina di stato, non un archivio — se un
+ * giorno servirà sfogliare tutto lo storico è una paginazione da
+ * aggiungere apposta, non il default di questa funzione.
+ */
+export async function getRecentCorrections(
+  limit = 20
+): Promise<DataCorrectionRow[]> {
+  return db
+    .select({
+      tableName: dataCorrections.tableName,
+      entityLabel: dataCorrections.entityLabel,
+      field: dataCorrections.field,
+      oldValue: dataCorrections.oldValue,
+      newValue: dataCorrections.newValue,
+      recordedAt: dataCorrections.recordedAt,
+      detectedAt: dataCorrections.detectedAt,
+      source: dataCorrections.source,
+    })
+    .from(dataCorrections)
+    .orderBy(desc(dataCorrections.detectedAt))
+    .limit(limit);
 }

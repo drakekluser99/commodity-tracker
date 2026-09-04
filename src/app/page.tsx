@@ -494,6 +494,7 @@ export default async function Home() {
                 pageLinks={[
                   { href: "/metodologia", label: "Metodologia" },
                   { href: "/glossario", label: "Glossario" },
+                  { href: "/stato-dati", label: "Stato dei dati" },
                 ]}
                 githubUrl={GITHUB_URL}
               />
@@ -532,6 +533,12 @@ export default async function Home() {
               className="flex items-center border-l border-system-chrome-border px-5 py-3 font-mono text-[11px] uppercase tracking-[0.1em] text-system-chrome-ink-muted transition-colors hover:text-system-chrome-accent"
             >
               Glossario
+            </Link>
+            <Link
+              href="/stato-dati"
+              className="flex items-center border-l border-system-chrome-border px-5 py-3 font-mono text-[11px] uppercase tracking-[0.1em] text-system-chrome-ink-muted transition-colors hover:text-system-chrome-accent"
+            >
+              Stato dei dati
             </Link>
           </div>
         </nav>
@@ -948,6 +955,14 @@ export default async function Home() {
                     className="text-system-chrome-ink transition-colors hover:text-system-chrome-accent"
                   >
                     Glossario
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/stato-dati"
+                    className="text-system-chrome-ink transition-colors hover:text-system-chrome-accent"
+                  >
+                    Stato dei dati
                   </Link>
                 </li>
                 <li>
