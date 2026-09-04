@@ -963,10 +963,27 @@ ponderata, import massivo storico, estrapolazioni causali.
   `src/lib/freshness/config.ts` una entry `mimit` (1 giorno atteso, 2 di
   grace — più stretta delle fonti settimanali perché una cadenza
   giornaliera che salta un giorno è già un segnale).
+  **Collegamento alla UI — FATTO (Cowork, 4 set 2026)**: fino a qui le 107
+  pagine esistevano ma si raggiungevano solo digitando l'URL a mano. Ora la
+  home ha una sezione dedicata ("05 / Carburanti in Italia, provincia per
+  provincia", `id="province"`, anche in `NAV_ITEMS`): media nazionale self
+  (benzina/gasolio, la stessa pesata di `italianFuelStats.ts`) più una
+  tabella ricercabile, `src/components/ItalyProvinceFuelTable.tsx` (nuovo
+  file). Non è un'estensione di `FuelPriceTable.tsx` perché la forma dei
+  dati è diversa — lì una riga è (paese, carburante), qui una riga è già
+  una provincia intera con benzina e gasolio affiancati — ma riusa la
+  stessa idea di UX (ricerca live + anteprima "solo gli estremi,
+  economiche/care" + "mostra tutte"), utile con 107 righe invece delle 27
+  di FuelPriceTable. Differenza voluta: ogni riga naviga al click (non solo
+  il nome) verso `/provincia/[slug]`, perché con 107 righe un bersaglio
+  piccolo sarebbe scomodo su mobile — il nome resta comunque un `<Link>`
+  vero (non solo `onClick` sulla riga), altrimenti un motore di ricerca non
+  vedrebbe nessun link scansionabile. `page.tsx` risolve lo slug di ogni
+  provincia lato server con `provinceForCode` prima di passare le righe al
+  componente client, così quest'ultimo non deve importare `provinces.ts`.
   **Ancora da fare**: un vero cron schedulato (oggi è uno script manuale,
-  coerente con "non prima di uno sprint libero" della roadmap) e un link
-  verso le pagine provincia da qualche punto della UI (oggi si raggiungono
-  solo digitando l'URL — nessuna mappa o tabella le collega ancora)
+  coerente con "non prima di uno sprint libero" della roadmap). Nessun
+  altro punto noto in sospeso per la Fase 4.
 - **Scomposizione fiscale — FATTA** (3 set 2026), ed è il contenuto che
   differenzia il sito. Il numero, sui dati del 31 agosto: dei 177 millesimi
   che l'Italia paga sopra la media dei 27, **155 sono imposte e 22 sono il

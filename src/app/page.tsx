@@ -4,6 +4,7 @@ import {
   getCommodityPriceHistory,
   getFuelPriceHistory,
   getLatestWeeklyNarratives,
+  getLatestItalianFuelPrices,
 } from "@/lib/db/queries";
 import { groupCommodityHistory, groupFuelHistory, priceMovers } from "@/lib/priceHistory";
 import { displayCommodityPrice } from "@/lib/commodityDisplay";
@@ -16,10 +17,13 @@ import {
 } from "@/lib/format";
 import { computeFreshness, getFreshnessConfig } from "@/lib/freshness/compute";
 import { computeEuropeFuelStats } from "@/lib/europeFuelStats";
+import { computeItalianFuelStats } from "@/lib/italianFuelStats";
+import { provinceForCode } from "@/lib/provinces";
 import EuropeFuelMap from "@/components/EuropeFuelMap";
 import FuelImpactCalculator from "@/components/FuelImpactCalculator";
 import MobileNav from "@/components/MobileNav";
 import { FuelPriceTable } from "@/components/FuelPriceTable";
+import { ItalyProvinceFuelTable } from "@/components/ItalyProvinceFuelTable";
 import { DownloadDataButtons } from "@/components/DownloadDataButtons";
 import { PriceHistoryChart } from "@/components/PriceHistoryChart";
 import { MercurialeMark } from "@/components/MercurialeMark";
@@ -110,6 +114,7 @@ const NAV_ITEMS = [
   { href: "#calcolatore", label: "Cosa significa", icon: Calculator },
   { href: "#materie-prime", label: "Materie prime", icon: BarChart3 },
   { href: "#carburanti", label: "Carburanti", icon: Fuel },
+  { href: "#province", label: "Province italiane", icon: Fuel },
 ];
 
 export default async function Home() {
@@ -133,14 +138,21 @@ export default async function Home() {
   const commodityHistorySince = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
   // eslint-disable-next-line react-hooks/purity
   const fuelHistorySince = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-  const [commodityPrices, fuelPrices, commodityHistory, fuelHistory, weeklyNarrative] =
-    await Promise.all([
-      getLatestCommodityPrices(),
-      getLatestFuelPrices(),
-      getCommodityPriceHistory(commodityHistorySince),
-      getFuelPriceHistory(fuelHistorySince),
-      getLatestWeeklyNarratives(),
-    ]);
+  const [
+    commodityPrices,
+    fuelPrices,
+    commodityHistory,
+    fuelHistory,
+    weeklyNarrative,
+    italianFuelPrices,
+  ] = await Promise.all([
+    getLatestCommodityPrices(),
+    getLatestFuelPrices(),
+    getCommodityPriceHistory(commodityHistorySince),
+    getFuelPriceHistory(fuelHistorySince),
+    getLatestWeeklyNarratives(),
+    getLatestItalianFuelPrices(),
+  ]);
   const commoditySeries = groupCommodityHistory(commodityHistory);
 
   // Timestamp unico per il calcolo di freschezza di tutte le righe (vedi
@@ -215,6 +227,32 @@ export default async function Home() {
   // legenda della mappa e la pagina metodologia).
   const { countries: europeanFuelData, average: europeAverage } =
     computeEuropeFuelStats(fuelPrices);
+
+  // Fase 4 — MIMIT, prezzi per provincia. `italianFuelStats` calcola già la
+  // media nazionale PESATA sul numero di impianti (vedi il commento esteso
+  // in quel file); qui aggiungiamo solo lo `slug` di ciascuna provincia,
+  // che serve al componente client per costruire il link a
+  // /provincia/[slug] senza dover importare provinces.ts in un Client
+  // Component (provinceForCode gira lato server, qui).
+  const { provinces: italianProvinces, average: italyAverage } =
+    computeItalianFuelStats(italianFuelPrices);
+  const italyProvinceRows = italianProvinces
+    .map((p) => {
+      const route = provinceForCode(p.provinceCode);
+      // Non dovrebbe succedere (provinceForCode arriva dalla stessa
+      // anagrafica di provinces.ts usata dal fetcher), ma se una sigla
+      // sconosciuta arrivasse comunque non vogliamo far cadere l'intera
+      // home: la scartiamo silenziosamente invece di lanciare un errore.
+      if (!route) return null;
+      return {
+        provinceCode: p.provinceCode,
+        provinceName: p.provinceName,
+        slug: route.slug,
+        petrolSelf: p.petrolSelf,
+        dieselSelf: p.dieselSelf,
+      };
+    })
+    .filter((r): r is NonNullable<typeof r> => r !== null);
 
   const usFuels = fuelsByContinent.get("north_america") ?? [];
   const usAverage = {
@@ -796,6 +834,56 @@ export default async function Home() {
             specifici
           </SourceNote>
         </section>
+
+        {/* Fase 4 (MIMIT): fino a questa sezione le 107 pagine
+            /provincia/[slug] esistevano già ma erano raggiungibili solo
+            digitando l'URL a mano — nessun link, nessuna tabella, nessuna
+            mappa ci portava. Questa sezione le collega alla UI: non è
+            decorativa, mostra dati reali (media nazionale pesata + tabella
+            ricercabile) che portano ciascuno alla propria pagina provincia. */}
+        {italyProvinceRows.length > 0 && (
+          <section id="province" className="mt-12 scroll-mt-8">
+            <div className="flex items-baseline gap-3">
+              <span className="font-mono text-xs text-system-ink-muted">05 /</span>
+              <h2 className="text-lg font-semibold text-system-ink">
+                Carburanti in Italia, provincia per provincia
+              </h2>
+            </div>
+            <p className="mt-1 text-sm leading-relaxed text-system-ink-secondary">
+              {italyAverage.petrolSelf !== null ? (
+                <>
+                  Media nazionale self:{" "}
+                  <strong className="text-system-ink">
+                    {formatFuelPrice(italyAverage.petrolSelf)} €/L
+                  </strong>{" "}
+                  benzina
+                  {italyAverage.dieselSelf !== null && (
+                    <>
+                      {" "}
+                      ·{" "}
+                      <strong className="text-system-ink">
+                        {formatFuelPrice(italyAverage.dieselSelf)} €/L
+                      </strong>{" "}
+                      gasolio
+                    </>
+                  )}
+                  , pesata sul numero di impianti di ciascuna provincia.
+                  Clicca una provincia per il dettaglio (self, servito,
+                  confronto con la media).
+                </>
+              ) : (
+                "Nessun dato ancora per le province italiane."
+              )}
+            </p>
+            <div className="mt-4">
+              <ItalyProvinceFuelTable rows={italyProvinceRows} />
+            </div>
+            <SourceNote sources={["mimit"]}>
+              Fonte: MIMIT, anagrafica e prezzi stazione per stazione,
+              aggregati per provincia · Aggiornamento: giornaliero
+            </SourceNote>
+          </section>
+        )}
       </main>
 
       {/* Footer sul chrome scuro, come l'header: la pagina è "incorniciata"
