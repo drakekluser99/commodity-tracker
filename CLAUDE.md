@@ -760,6 +760,32 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   aggiungere una variabile d'ambiente, verifica con `Select-String` se
   esiste già — una riga duplicata produce 401 che sembrano casuali su
   chiamate identiche
+- **Branch locale sbagliato senza accorgersene** (4 set 2026). Il clone
+  di lavoro (`C:\Users\ammin\progetti\commodity-tracker`) era rimasto
+  checked out su un branch di feature (`mappa-legenda`) invece di
+  `main`, con `main` locale 20 commit indietro rispetto a
+  `origin/main` (merge di PR fatti su GitHub mai scaricati in locale
+  con `git pull`). `git push origin main` da un branch diverso da
+  `main` prova a pushare il ref locale `main` — vecchio — non il
+  branch corrente: il rifiuto `[rejected] ... fetch first` che ne
+  risulta è fuorviante, sembra un problema di sincronizzazione remota
+  quando in realtà si sta pushando la cosa sbagliata. Prima di ogni
+  `git push origin main`, controllare `git status` (branch corrente +
+  eventuali merge a metà) e non dare per scontato di essere su `main`
+  solo perché è lì che si vuole finire. Recupero pulito quando càpita:
+  `git merge --abort` (se c'è un merge a metà) → `git checkout main` →
+  `git pull origin main` → `git cherry-pick <branch-con-il-commit-buono>`
+  per portare solo il commit che serve, senza tutto il resto del branch
+  di feature → `git push origin main`
+- **Environment variable "sensitive" visibile nella UI di Vercel ma
+  assente a runtime** (4 set 2026, vedi bullet `EIA_API_KEY` /
+  `CRON_SECRET` più sopra). Non fidarsi dello screenshot delle
+  Environment Variables come prova che una route la vede: verificare
+  con una route di debug temporanea che riporta `!!process.env.X` e la
+  lunghezza (mai il valore). Se conferma l'assenza, cancellare la
+  entry su Vercel e ricrearla digitando il nome a mano (non
+  incollandolo) — sospetto principale è un carattere invisibile nel
+  campo Key, indistinguibile a schermo
 
 ## Workflow con l'utente
 
@@ -1029,10 +1055,25 @@ ponderata, import massivo storico, estrapolazioni causali.
   con `--only` (quota Alpha Vantage esaurita al primo lancio). Prossimo
   passo naturale ora che i dati ci sono: una finestra più lunga dei 90/30
   giorni attuali in `PriceHistoryChart`
-- **`EIA_API_KEY` su Vercel in `Production` — scadenza lunedì 18:00 UTC.**
-  È l'unico guasto vero rimasto in agenda: vedi la correzione della
-  correzione nella diagnosi sopra. In locale funziona già; su Production
-  la variabile risultava solo su `Preview` e non è stato riverificato
+- **`EIA_API_KEY` / `CRON_SECRET` su Vercel in `Production` — RISOLTO
+  (4 set 2026).** Non era un problema di redeploy né di valore sbagliato:
+  la variabile appariva correttamente nella UI di Vercel ("Production",
+  con data) ma non arrivava a `process.env` a runtime — sospetto
+  principale, un carattere invisibile finito nel campo **Key** al
+  momento della creazione (es. uno spazio finale: `CRON_SECRET ` e
+  `CRON_SECRET` sono indistinguibili nella UI). Isolato con una route di
+  debug temporanea (`/api/debug/cron-secret-check`, pubblica, riportava
+  solo presenza/lunghezza del segreto — mai il valore — poi RIMOSSA dal
+  repo a diagnosi conclusa). **Cancellare la entry su Vercel e
+  ricrearla da zero, digitando il nome invece di incollarlo**, ha
+  risolto per entrambe le variabili. Verificato con una chiamata reale
+  al cron (non solo con la UI): `{ ok: true, saved: 2 }`. Dettaglio
+  completo nel project doc
+  `mercuriale-riepilogo-4-set-2026-fix-cron-secret.md`. **Lezione**: se
+  un giorno un'altra sensitive env var sembra presente nella UI ma il
+  codice non la vede, non fidarsi dello screenshot — verificare a
+  runtime con una route di debug, e se conferma l'assenza, cancellare e
+  ricreare la entry (digitando il nome) prima di sospettare altro
 - **Audit sicurezza (3 set 2026)**: fatto. Trovato e corretto il bypass
   di `CRON_SECRET` sopra; aggiunti header di sicurezza in
   `next.config.ts` (`X-Frame-Options: DENY`, `nosniff`,
@@ -1118,13 +1159,13 @@ ponderata, import massivo storico, estrapolazioni causali.
     Parte locale RISOLTA: `EIA_API_KEY` è ora in `.env.local` e la run
     manuale delle 13:50:29 del 3 set riporta `ok: true`, `points_saved:
     2`. **Ma funzionare in locale non dice nulla su Production** — è la
-    stessa identica trappola di sopra, al contrario. Da fare PRIMA di
-    lunedì 18:00 UTC: aggiungere `Production` agli Environments della
-    variabile su Vercel. Se il valore non è più disponibile (è `Secret`,
-    write-only) va rigenerato su eia.gov/opendata/register.php — arriva
-    per email, non a schermo — e riscritto NELLO STESSO MOMENTO in
-    `.env.local`, su Vercel (tutti gli ambienti) e in un gestore di
-    password, altrimenti fra due mesi si è di nuovo qui
+    stessa identica trappola di sopra, al contrario.
+    **RISOLTO DAVVERO il 4 set 2026** — vedi il bullet
+    "`EIA_API_KEY` / `CRON_SECRET` su Vercel in Production — RISOLTO"
+    qualche riga sopra per la causa reale (non mancava su Production,
+    non veniva letta a runtime per un problema nella entry stessa) e la
+    correzione. Verificato con una chiamata autenticata reale al cron,
+    non solo con la UI di Vercel
 - **Colonna `latest_recorded_at` in `fetch_runs` — da fare.** Nasce dalla
   diagnosi sopra: siccome `points_saved` non distingue "dato nuovo" da
   "stesso dato riscritto", per capire se una fonte è ferma servono due
