@@ -786,6 +786,20 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   entry su Vercel e ricrearla digitando il nome a mano (non
   incollandolo) — sospetto principale è un carattere invisibile nel
   campo Key, indistinguibile a schermo
+- **`.gitignore`, `.env*` non copre tutti i nomi.** Il pattern `.env*`
+  non intercetta un file senza punto iniziale (es. `Claude
+  outputs/env.local`, una copia locale delle variabili d'ambiente fatta
+  da una sessione Cowork). `git add -A` l'ha messo in staging con dentro
+  `DATABASE_URL`, `CRON_SECRET` e le chiavi API vere, a un passo dal
+  commit su un repo pubblico (4 set 2026, sessione registro correzioni —
+  intercettato con `git status` prima del commit, mai finito in git:
+  confermato con `git log --all --oneline -- <file>` vuoto). Aggiunta
+  la riga `/Claude outputs/` esplicita al `.gitignore`. **Prima di
+  ogni `git add -A`/`git commit` in questo repo, leggere `git status`
+  per intero e cercare in particolare file con `env`, `secret`, `key`
+  nel nome che non siano quelli attesi** — non fidarsi del fatto che
+  `.gitignore` esista, verificarne l'effetto riga per riga quando un
+  file nuovo compare in staging da una cartella non vista prima
 
 ## Workflow con l'utente
 
@@ -1166,13 +1180,30 @@ ponderata, import massivo storico, estrapolazioni causali.
     non veniva letta a runtime per un problema nella entry stessa) e la
     correzione. Verificato con una chiamata autenticata reale al cron,
     non solo con la UI di Vercel
-- **Colonna `latest_recorded_at` in `fetch_runs` — da fare.** Nasce dalla
-  diagnosi sopra: siccome `points_saved` non distingue "dato nuovo" da
-  "stesso dato riscritto", per capire se una fonte è ferma servono due
-  query e un ragionamento. Salvando in ogni run la `recorded_at` più
-  recente vista, la differenza tra "la fonte è ferma" e "noi non
-  peschiamo" si legge in una riga sola. È anche il dato che serve alla
-  pagina pubblica "Stato dei dati"
+- **Colonna `latest_recorded_at` in `fetch_runs` — FATTO (4 set 2026,
+  sessione registro correzioni).** Nasce dalla diagnosi sopra: siccome
+  `points_saved` non distingue "dato nuovo" da "stesso dato riscritto",
+  per capire se una fonte è ferma servivano due query e un ragionamento.
+  Ora ogni run salva la `recorded_at` più recente vista fra i punti
+  salvati (`savePricePoints`, `saveEuFuelPrices`, `saveUsFuelPrices`
+  la calcolano e la passano a `finishFetchRun`). Manca ancora la pagina
+  pubblica "Stato dei dati" che la userebbe — il dato in tabella c'è,
+  la pagina no.
+- **Registro delle correzioni (`data_corrections`) — FATTO (4 set 2026).**
+  Fase 3 della roadmap, ultima voce rimasta. Una riga ogni volta che un
+  fetcher sovrascrive un valore già salvato con uno diverso (non la
+  prima scrittura — quella riempie una casella vuota, non corregge
+  niente). Modulo `src/lib/fetchers/correctionsLog.ts`
+  (`logCorrectionIfChanged`), tolleranza 0.00005 per non confondere
+  arrotondamenti con vere correzioni. Wired solo nei cron veri (Alpha
+  Vantage, bollettino UE — 4 campi: prezzo/netto/accisa/IVA —, EIA USA),
+  NON nel backfill storico né nel cron MIMIT: nei commenti di
+  `savePricePointsBulk`, `saveRetailFuelPricesBulk` e `saveMimitPrices`
+  c'è scritto perché caso per caso (backfill = prima scrittura di
+  migliaia di righe, non correzioni; MIMIT = ogni giorno è un'estrazione
+  indipendente, non la revisione di un giorno passato). Nessuna UI
+  ancora — è igiene dei dati, non user-facing, come da roadmap. Con
+  questo la roadmap del 3 settembre 2026 è chiusa per intero (fasi 0-4).
 
 ## Skill: vercel-react-best-practices
 
