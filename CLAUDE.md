@@ -836,6 +836,15 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   `git log --oneline` e lo stato reale della PR: in questa sessione tutta
   la Fase 3 risultava già committata e già mergiata quando è iniziata,
   nonostante il riepilogo la descrivesse come lavoro in sospeso.
+- **`adm.gov.it` (Agenzia delle Dogane) blocca il fetch automatico**
+  (4 set 2026, ricerca per "numero del giorno"): sia le pagine HTML sia
+  i PDF dei comunicati stampa tornano 403 al tool di ricerca web, anche
+  se l'URL è corretto e pubblicamente indicizzato da Google — restano
+  raggiungibili da un browser normale. Stesso per `finanze.gov.it` (i
+  bollettini mensili delle entrate tributarie). Per un dato di queste
+  fonti, cercare la citazione ripresa da stampa specializzata (in questo
+  caso Il Riformista) invece di insistere sul fetch diretto, e linkare
+  comunque la pagina istituzionale come `sourceUrl` per il lettore.
 
 ## Cosa manca / prossimi passi naturali
 
@@ -858,9 +867,36 @@ ponderata, import massivo storico, estrapolazioni causali.
 - **Prosa metodologia/glossario allineata al modello a 3 stati — FATTO**
   (Fase 1, 3 set 2026): `metodologia/page.tsx` e `glossario/page.tsx`
   menzionano ora anche `in_attesa`, non solo il vecchio badge binario
-- **Pagina pubblica "Stato dei dati"**: modello dati pronto
-  (`fetch_runs`), pagina da costruire (ultimo tentativo / ultimo
-  successo / ultimo dato / errore recente per fonte)
+- **Pagina pubblica "Stato dei dati" — FATTO (Cowork, 4 set 2026, sessione
+  serale).** `/stato-dati` (`src/app/stato-dati/page.tsx`), collegata in
+  nav desktop/mobile/footer come Metodologia e Glossario. Due sezioni:
+  - **Pipeline di acquisizione**: una card per JOB (non per fonte —
+    Alpha Vantage ha 5 job, uno per batch) con l'ultima esecuzione
+    registrata, badge di stato, punti salvati, dato più recente. Due
+    scelte non ovvie: (a) NESSUN badge di freschezza per i 5 batch Alpha
+    Vantage, perché mescolano commodity a cadenza diversa (es. batch 2:
+    gas naturale giornaliero + rame mensile) e un giudizio unico
+    nasconderebbe la serie più lenta — badge calcolato solo per
+    `eu_weekly_oil_bulletin`/`eia_us`, dove tutta la fonte condivide
+    un'unica cadenza; (b) un run rimasto `ok: null` (mai concluso) da
+    più di `STALE_RUN_MINUTES` (10) passa da "in corso" a "interrotto":
+    le funzioni cron di Vercel hanno `maxDuration` di pochi secondi, un
+    run così vecchio è quasi certamente un crash che non ha mai chiamato
+    `finishFetchRun`, non un'esecuzione ancora in volo.
+  - **Correzioni recenti**: le ultime righe di `data_corrections`,
+    formattate per campo (`vat_rate_percent` è un'aliquota con `%`, non
+    un prezzo — usare `formatFuelPrice` l'avrebbe mostrata come un
+    prezzo per errore).
+  - Dichiara esplicitamente cosa NON copre (sezione "Limiti di questa
+    pagina"): il cron MIMIT non scrive ancora in `fetch_runs` (solo
+    conteggio righe), quindi non compare.
+  - Nuove query in `src/lib/db/queries.ts`: `getLatestFetchRuns()`
+    (dedup per job, stessa tecnica delle altre `getLatest*`) e
+    `getRecentCorrections(limit)`.
+  - **Non verificata con `tsc`/`eslint` in questa sessione**: nessuna
+    shell sul PC dell'utente disponibile (solo il bridge file), solo
+    scrittura diretta dei file. Commit `ad22850` fatto e pushato
+    dall'utente senza segnalare errori di build.
 - **Registro correzioni** (Fase 3, ancora da fare): quando una fonte
   ripubblica un valore DIVERSO per la stessa data, oggi
   l'`onConflictDoUpdate` lo sovrascrive e la vecchia versione sparisce.
@@ -870,14 +906,45 @@ ponderata, import massivo storico, estrapolazioni causali.
   nello storico: va progettato a parte, NON con un insert puro
   (reintrodurrebbe il bug dei duplicati). Va di pari passo con
   `latest_recorded_at` in `fetch_runs`, sotto
-- **"Numero del giorno" da fonte annuale** (Fase 3, idea dall'analisi
-  competitor, ancora da fare): una riga tipo "le accise sui carburanti
-  valgono X miliardi di euro l'anno", sourced al rapporto MEF/Agenzia
-  delle Dogane più recente, aggiornata una volta l'anno — NON calcolata
-  dal cron settimanale, che non ha il volume di litri venduti per farlo
-  onestamente. Va marcata con la data della fonte, altrimenti si ripete
-  l'errore trovato nei siti concorrenti: un numero statico spacciato per
-  vivo
+- **"Numero del giorno" da fonte annuale — FATTO (Cowork, 4 set 2026,
+  sessione serale).** Ultima voce della roadmap del 3 settembre. Sezione
+  "Il numero del giorno" in home (simbolo `§`, senza numero d'indice —
+  stesso trattamento di "Cosa è cambiato"/"Maggiori variazioni"), fra
+  "Maggiori variazioni" e la mappa carburanti.
+  **Scelta della fonte** (ricerca via web search in sessione, due
+  candidati verificati): 39 mld € (accise specifiche benzina+gasolio,
+  fonte Annuario Statistico ACI 2025 — ma ACI non dichiara la propria
+  fonte primaria) contro **26,7 mld €** (accisa sui "prodotti
+  energetici", categoria fiscale più ampia di solo benzina/gasolio, ma
+  con fonte DIRETTA: Agenzia delle Dogane e dei Monopoli, bilancio
+  annuale dell'attività, dati 2024). Scelto il secondo — decisione
+  chiesta esplicitamente all'utente (AskUserQuestion): meno "pulito"
+  nello scope, ma la fonte è quella istituzionale giusta, non un
+  intermediario. `adm.gov.it` blocca il fetch automatico (verificato: i
+  PDF ufficiali tornano 403 al tool di ricerca), il numero è verificato
+  da una citazione diretta ripresa da stampa specializzata (Il
+  Riformista) del bilancio ADM presentato agli Stati Generali di maggio
+  2025 — link in `sourceUrl` punta comunque alla pagina istituzionale
+  ADM, raggiungibile da un browser normale anche se non dal tool.
+  **Struttura scelta apposta per non ripetere l'errore isolato
+  nell'analisi competitor** (un numero statico spacciato per vivo):
+  `src/lib/annualFigures.ts`, UN oggetto `ANNUAL_FIGURE` esportato (non
+  un array — oggi c'è un solo numero), con `year` esplicito che finisce
+  in etichetta ("dati 2024"). Non è un cron: **va aggiornato A MANO**
+  ogni primavera quando l'ADM pubblica il bilancio dell'anno precedente
+  (i due comunicati trovati durante la ricerca sono di maggio 2025 e
+  maggio 2026) — il commento in testa al file lo dice esplicitamente. Se
+  questo file non viene toccato per anni, l'etichetta "dati 2024" resta
+  ferma e continua a dirlo onestamente, invece di far sembrare il numero
+  più fresco di quanto sia.
+  Aggiunte di contorno: nuovo `SourceId` `"adm"` in `src/lib/sources.ts`
+  (kind `primaria`), nuovo `formatBillionsEur()` in `src/lib/format.ts`
+  (1 decimale, non 2 come i prezzi — un miliardo con 2 decimali
+  implicherebbe una precisione che una cifra di bilancio "circa" non
+  ha), nuova voce ADM in "Fonti dei dati" di `metodologia/page.tsx`.
+  **Non verificato con `tsc`/`eslint`** in questa sessione, stesso
+  motivo del bullet "Stato dei dati" sopra — nessuna shell sul PC
+  disponibile.
 - **Localizzazione nomi paese — FATTO (2 set 2026)** per tabella
   carburanti e tooltip mappa. `src/lib/countryNames.ts`
   (`COUNTRY_NAMES_IT` + `localizedCountryName`, fallback esplicito al
@@ -1202,8 +1269,12 @@ ponderata, import massivo storico, estrapolazioni causali.
   c'è scritto perché caso per caso (backfill = prima scrittura di
   migliaia di righe, non correzioni; MIMIT = ogni giorno è un'estrazione
   indipendente, non la revisione di un giorno passato). Nessuna UI
-  ancora — è igiene dei dati, non user-facing, come da roadmap. Con
-  questo la roadmap del 3 settembre 2026 è chiusa per intero (fasi 0-4).
+  ancora — è igiene dei dati, non user-facing, come da roadmap.
+  **Con la pagina "Stato dei dati" e il "numero del giorno" (entrambi
+  FATTO, Cowork, 4 set 2026, vedi i due bullet sopra) la roadmap del 3
+  settembre 2026 è chiusa per intero, incluse le due voci di Fase 3 che
+  erano rimaste aperte dopo questo bullet.** La roadmap non prevede una
+  "fase 5": resta ferma qui finché non emerge un motivo nuovo.
 
 ## Skill: vercel-react-best-practices
 

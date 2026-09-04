@@ -14,7 +14,9 @@ import {
   formatPercent,
   shortUnit,
   currencySymbol,
+  formatBillionsEur,
 } from "@/lib/format";
+import { ANNUAL_FIGURE } from "@/lib/annualFigures";
 import { computeFreshness, getFreshnessConfig } from "@/lib/freshness/compute";
 import { computeEuropeFuelStats } from "@/lib/europeFuelStats";
 import { computeItalianFuelStats } from "@/lib/italianFuelStats";
@@ -651,6 +653,38 @@ export default async function Home() {
             </SourceNote>
           </section>
         )}
+
+        {/* "Il numero del giorno": Fase 3, l'ultima voce della roadmap del
+            3 settembre. Diverso da ogni altra sezione della pagina — non
+            un cron, non ricalcolato a ogni visita: una cifra che l'Agenzia
+            delle Dogane pubblica una volta l'anno nel proprio bilancio
+            dell'attività (vedi src/lib/annualFigures.ts). L'anno in
+            etichetta ("dati {ANNUAL_FIGURE.year}") è deliberato: se questo
+            file non viene toccato per anni, l'etichetta lo dice invece di
+            far sembrare il numero più fresco di quanto sia — l'errore
+            isolato nell'analisi competitor (un numero statico spacciato
+            per vivo). */}
+        <section className="mb-12">
+          <div className="flex items-baseline gap-3">
+            <span className="font-mono text-xs text-system-ink-muted">§</span>
+            <h2 className="text-lg font-semibold text-system-ink">
+              Il numero del giorno
+            </h2>
+          </div>
+          <div className="mt-4 rounded-lg border border-system-border bg-system-surface p-6">
+            <p className="font-mono text-3xl font-semibold tabular-nums text-system-ink sm:text-4xl">
+              {formatBillionsEur(ANNUAL_FIGURE.valueEur)}
+            </p>
+            <p className="mt-2 text-sm leading-relaxed text-system-ink-secondary">
+              {ANNUAL_FIGURE.headline}
+            </p>
+          </div>
+          <SourceNote sources={[ANNUAL_FIGURE.sourceId]}>
+            Fonte: Agenzia delle Dogane e dei Monopoli · dati {ANNUAL_FIGURE.year} ·
+            aggiornato una volta l&apos;anno (bilancio dell&apos;attività), non
+            dal cron settimanale dei carburanti
+          </SourceNote>
+        </section>
 
         {europeanFuelData.length > 0 && (
           <section id="mappa" className="scroll-mt-8">

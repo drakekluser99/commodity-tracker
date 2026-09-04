@@ -46,6 +46,11 @@ export default function Metodologia() {
             desc="Prezzi medi nazionali settimanali di benzina e diesel negli Stati Uniti, ente statistico ufficiale del governo USA."
             link="https://www.eia.gov/opendata"
           />
+          <SourceItem
+            name="Agenzia delle Dogane e dei Monopoli"
+            desc="Fonte del «numero del giorno» in home: una cifra dal bilancio annuale dell'attività dell'Agenzia, non un dato aggiornato da un cron — vedi «Frequenza di aggiornamento» qui sotto."
+            link="https://www.adm.gov.it"
+          />
         </Section>
 
         <Section index="02" title="Frequenza di aggiornamento">

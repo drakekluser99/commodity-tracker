@@ -85,6 +85,18 @@ export function currencySymbol(currency: string): string {
 }
 
 /**
+ * Importo in euro espresso in miliardi, con un decimale (es. 26700000000 ->
+ * "26,7 miliardi di €"). Pensato per il "numero del giorno" (Fase 3):
+ * una cifra istituzionale annuale, non un prezzo — non riusa `nf(2)` come
+ * i prezzi perché un miliardo con 2 decimali ("26,70 miliardi") implica
+ * una precisione che una cifra di bilancio dichiarata "circa" non ha.
+ */
+export function formatBillionsEur(valueEur: number): string {
+  const billions = valueEur / 1_000_000_000;
+  return `${nf(1).format(billions)} miliardi di €`;
+}
+
+/**
  * Data in formato it-IT (es. "03/09/2026"). Era definita solo dentro
  * page.tsx: spostata qui perché ora serve anche alle pagine /paese/[slug],
  * ed è comunque formattazione — lo stesso motivo per cui vive questo file.

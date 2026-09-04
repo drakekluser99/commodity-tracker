@@ -12,7 +12,7 @@
 
 export type SourceKind = "primaria" | "aggregata";
 
-export type SourceId = "eu-commission" | "eia" | "alpha-vantage" | "mimit";
+export type SourceId = "eu-commission" | "eia" | "alpha-vantage" | "mimit" | "adm";
 
 type SourceMeta = {
   /** Nome per esteso, usato nel testo delle note "Fonte:". */
@@ -38,6 +38,13 @@ export const SOURCES: Record<SourceId, SourceMeta> = {
   // commerciale — stessa categoria di Commissione Europea/EIA.
   mimit: {
     label: "MIMIT (Ministero delle Imprese e del Made in Italy)",
+    kind: "primaria",
+  },
+  // "Numero del giorno" (Fase 3): un'unica cifra annuale, non un cron —
+  // vedi src/lib/annualFigures.ts. Ente pubblico con dato autoprodotto
+  // (il proprio gettito), stessa categoria delle altre fonti primarie.
+  adm: {
+    label: "Agenzia delle Dogane e dei Monopoli",
     kind: "primaria",
   },
 };
