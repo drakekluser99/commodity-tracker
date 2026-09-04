@@ -12,6 +12,15 @@ export interface CountryFuelPoint {
   /** Prezzi al netto delle imposte. `null` dove la Commissione non li pubblica. */
   petrolNet: number | null;
   dieselNet: number | null;
+  /**
+   * Accisa (euro/litro) e aliquota IVA (%) — Fase 3. `null` dove il foglio
+   * delle accise/IVA non copre quel paese in quella settimana, con lo
+   * stesso significato di `petrolNet`/`dieselNet`: niente non è zero.
+   */
+  petrolExciseEur: number | null;
+  dieselExciseEur: number | null;
+  petrolVatRatePercent: number | null;
+  dieselVatRatePercent: number | null;
   recordedAt: Date | null;
 }
 
@@ -61,19 +70,31 @@ export function computeEuropeFuelStats(fuelPrices: LatestFuelPrice[]): {
       diesel: null,
       petrolNet: null,
       dieselNet: null,
+      petrolExciseEur: null,
+      dieselExciseEur: null,
+      petrolVatRatePercent: null,
+      dieselVatRatePercent: null,
       recordedAt: null,
     };
     // `priceNet` arriva come stringa o null: `parseFloat(null)` darebbe NaN,
     // che è un numero e passerebbe indenne. Il ternario tiene il null null.
+    // Stessa cautela per accisa e aliquota IVA.
     const net = f.priceNet !== null ? parseFloat(f.priceNet) : null;
+    const excise = f.exciseEur !== null ? parseFloat(f.exciseEur) : null;
+    const vatRate =
+      f.vatRatePercent !== null ? parseFloat(f.vatRatePercent) : null;
     const price = parseFloat(f.price);
     if (f.fuelType === "petrol") {
       existing.petrol = price;
       existing.petrolNet = net;
+      existing.petrolExciseEur = excise;
+      existing.petrolVatRatePercent = vatRate;
     }
     if (f.fuelType === "diesel") {
       existing.diesel = price;
       existing.dieselNet = net;
+      existing.dieselExciseEur = excise;
+      existing.dieselVatRatePercent = vatRate;
     }
     if (!existing.recordedAt || f.recordedAt > existing.recordedAt) {
       existing.recordedAt = f.recordedAt;
@@ -123,6 +144,52 @@ export function taxSharePercent(
 ): number | null {
   if (gross === null || net === null || gross <= 0) return null;
   return ((gross - net) / gross) * 100;
+}
+
+/**
+ * IVA in euro al litro. Si calcola, non si legge dal database — solo
+ * l'aliquota (`vatRatePercent`) è un dato grezzo, l'importo è sempre
+ * derivato da qui, un solo posto invece di ricalcolarlo a ogni pagina.
+ *
+ * Base imponibile = prezzo netto + accisa: è così che l'IVA sui carburanti
+ * si applica per legge nell'UE, sul prezzo comprensivo di accisa e non sul
+ * solo prezzo industriale. `null` se manca uno qualunque dei tre input —
+ * un'IVA calcolata su una base incompleta sarebbe un numero inventato.
+ */
+export function vatEurPerLiter(
+  net: number | null,
+  exciseEur: number | null,
+  vatRatePercent: number | null
+): number | null {
+  if (net === null || exciseEur === null || vatRatePercent === null) {
+    return null;
+  }
+  return ((net + exciseEur) * vatRatePercent) / 100;
+}
+
+/**
+ * Il residuo fiscale che accisa e IVA non spiegano: prezzo lordo meno
+ * netto meno accisa meno IVA. Copre "Other Indirect Taxes" (foglio che
+ * deliberatamente non leggiamo, vedi euOilBulletinHistory.ts) e i piccoli
+ * scarti di arrotondamento tra le fonti. `null` se manca un ingrediente —
+ * mai forzato a 0, che nasconderebbe un dato mancante come se fosse un
+ * residuo davvero nullo.
+ *
+ * Non è mai negativo per costruzione fiscale, ma un valore leggermente
+ * sotto zero PUÒ comparire per via di arrotondamenti fra fogli diversi
+ * della stessa fonte: si clampa a 0 solo qui, in visualizzazione, senza
+ * toccare i dati salvati.
+ */
+export function otherTaxesPerLiter(
+  gross: number | null,
+  net: number | null,
+  exciseEur: number | null,
+  vatEur: number | null
+): number | null {
+  if (gross === null || net === null || exciseEur === null || vatEur === null) {
+    return null;
+  }
+  return Math.max(0, gross - net - exciseEur - vatEur);
 }
 
 /**

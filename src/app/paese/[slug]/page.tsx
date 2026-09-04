@@ -7,6 +7,8 @@ import {
   taxPerLiter,
   taxSharePercent,
   rankByTaxShare,
+  vatEurPerLiter,
+  otherTaxesPerLiter,
 } from "@/lib/europeFuelStats";
 import { EU_COUNTRY_SLUGS, englishNameForSlug } from "@/lib/countries";
 import { localizedCountryName } from "@/lib/countryNames";
@@ -103,6 +105,35 @@ export default async function CountryPage({ params }: PageProps) {
   const dieselTax = taxPerLiter(country.diesel, country.dieselNet);
   const petrolTaxShare = taxSharePercent(country.petrol, country.petrolNet);
   const dieselTaxShare = taxSharePercent(country.diesel, country.dieselNet);
+
+  // Scomposizione accisa/IVA (Fase 3): derivata qui e non nel database, per
+  // lo stesso motivo spiegato in europeFuelStats.ts — un solo posto dove
+  // ricalcolarla. `null` a catena quando manca anche solo un ingrediente:
+  // il foglio delle accise/IVA non copre ogni paese fin dal 2005, quindi
+  // in molte settimane la scomposizione fine non è disponibile anche
+  // quando "di cui imposte" totale lo è.
+  const petrolVatEur = vatEurPerLiter(
+    country.petrolNet,
+    country.petrolExciseEur,
+    country.petrolVatRatePercent
+  );
+  const petrolOtherTax = otherTaxesPerLiter(
+    country.petrol,
+    country.petrolNet,
+    country.petrolExciseEur,
+    petrolVatEur
+  );
+  const dieselVatEur = vatEurPerLiter(
+    country.dieselNet,
+    country.dieselExciseEur,
+    country.dieselVatRatePercent
+  );
+  const dieselOtherTax = otherTaxesPerLiter(
+    country.diesel,
+    country.dieselNet,
+    country.dieselExciseEur,
+    dieselVatEur
+  );
   const petrolRanks = rankByTaxShare(countries, "petrol");
   const rank = petrolRanks.get(englishName) ?? null;
 
@@ -176,6 +207,9 @@ export default async function CountryPage({ params }: PageProps) {
             gross={country.petrol}
             net={country.petrolNet}
             tax={petrolTax}
+            excise={country.petrolExciseEur}
+            vat={petrolVatEur}
+            otherTax={petrolOtherTax}
             share={petrolTaxShare}
             avgGross={average.petrol}
             currency="EUR"
@@ -185,6 +219,9 @@ export default async function CountryPage({ params }: PageProps) {
             gross={country.diesel}
             net={country.dieselNet}
             tax={dieselTax}
+            excise={country.dieselExciseEur}
+            vat={dieselVatEur}
+            otherTax={dieselOtherTax}
             share={dieselTaxShare}
             avgGross={average.diesel}
             currency="EUR"
@@ -245,6 +282,9 @@ function FuelStatCard({
   gross,
   net,
   tax,
+  excise,
+  vat,
+  otherTax,
   share,
   avgGross,
   currency,
@@ -253,11 +293,27 @@ function FuelStatCard({
   gross: number | null;
   net: number | null;
   tax: number | null;
+  /** Accisa, IVA e residuo — Fase 3. `null` a catena se il foglio delle
+   * accise/IVA non copre questo paese in questa settimana: in quel caso si
+   * mostra solo il totale "di cui imposte", senza scomporlo a metà. */
+  excise: number | null;
+  vat: number | null;
+  otherTax: number | null;
   share: number | null;
   avgGross: number | null;
   currency: string;
 }) {
   const symbol = currencySymbol(currency);
+  // La scomposizione fine (accisa/IVA/altro) si mostra solo quando è
+  // COMPLETA: mostrare accisa da sola con IVA a "—" lascerebbe intendere
+  // che l'IVA sia zero invece che sconosciuta. Un oggetto e non tre
+  // variabili sciolte: così TypeScript restringe i tre valori a "non
+  // null" dentro il blocco JSX che lo usa, invece di richiedere un
+  // controllo separato (e ripetuto) su ognuno.
+  const breakdown =
+    excise !== null && vat !== null && otherTax !== null
+      ? { excise, vat, otherTax }
+      : null;
   return (
     <SystemCard eyebrow={label}>
       <div className="space-y-2 text-sm">
@@ -274,6 +330,27 @@ function FuelStatCard({
           label="Di cui imposte"
           value={tax !== null ? `${formatFuelPrice(tax)} ${symbol}/L` : "—"}
         />
+        {breakdown && (
+          <div className="ml-3 space-y-1.5 border-l border-system-border-subtle pl-3">
+            <Row
+              label="Accisa"
+              value={`${formatFuelPrice(breakdown.excise)} ${symbol}/L`}
+              muted
+            />
+            <Row
+              label="IVA"
+              value={`${formatFuelPrice(breakdown.vat)} ${symbol}/L`}
+              muted
+            />
+            {breakdown.otherTax > 0.0005 && (
+              <Row
+                label="Altre imposte"
+                value={`${formatFuelPrice(breakdown.otherTax)} ${symbol}/L`}
+                muted
+              />
+            )}
+          </div>
+        )}
         <Row
           label="Quota fiscale"
           value={

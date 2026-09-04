@@ -28,6 +28,10 @@ export interface RetailFuelBulkPoint {
    * per l'EIA, che dà solo il prezzo alla pompa.
    */
   priceNetPerLiter?: number | null;
+  /** Accisa in euro/litro, quando la fonte la pubblica (solo UE, Fase 3). */
+  exciseEurPerLiter?: number | null;
+  /** Aliquota IVA in percentuale, quando la fonte la pubblica (solo UE, Fase 3). */
+  vatRatePercent?: number | null;
   currency: string;
   date: string; // YYYY-MM-DD
 }
@@ -82,6 +86,8 @@ export async function saveRetailFuelPricesBulk(
     fuelType: string;
     price: string;
     priceNet: string | null;
+    exciseEur: string | null;
+    vatRatePercent: string | null;
     currency: string;
     unit: string;
     recordedAt: Date;
@@ -100,6 +106,8 @@ export async function saveRetailFuelPricesBulk(
       fuelType: point.fuelType,
       price: point.pricePerLiter.toString(),
       priceNet: point.priceNetPerLiter?.toString() ?? null,
+      exciseEur: point.exciseEurPerLiter?.toString() ?? null,
+      vatRatePercent: point.vatRatePercent?.toString() ?? null,
       currency: point.currency,
       unit: "liter",
       recordedAt: new Date(point.date),
@@ -126,10 +134,12 @@ export async function saveRetailFuelPricesBulk(
         // tutti sullo stesso numero.
         set: {
           price: sql`excluded.price`,
-          // Anche il netto va letto da `excluded`: è l'unico modo perché
-          // ogni riga del blocco conservi il PROPRIO valore invece che
-          // quello dell'ultima riga vista.
+          // Anche netto, accisa e IVA vanno letti da `excluded`: è l'unico
+          // modo perché ogni riga del blocco conservi il PROPRIO valore
+          // invece che quello dell'ultima riga vista.
           priceNet: sql`excluded.price_net`,
+          exciseEur: sql`excluded.excise_eur`,
+          vatRatePercent: sql`excluded.vat_rate_percent`,
           currency: sql`excluded.currency`,
           retrievedAt,
           source,
