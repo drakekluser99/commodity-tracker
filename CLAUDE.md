@@ -935,10 +935,38 @@ ponderata, import massivo storico, estrapolazioni causali.
     (contatori, nessuna scrittura) / `--save` (scrive). Il flusso
     dry-run-poi-save ha trovato il bug sopra PRIMA che toccasse il
     database — esattamente il motivo per cui esiste in due modalità
-  **Ancora da fare**: `/provincia/[slug]` (Fase 2 ne è il pattern) e —
-  solo più avanti — un vero cron schedulato (oggi è uno script manuale,
-  coerente con "non prima di uno sprint libero" della roadmap). Nessuna
-  pagina pubblica mostra ancora questo dato: è in tabella ma non in UI
+  **`/provincia/[slug]` — FATTO (Cowork, 4 set 2026)**: pagina per singola
+  provincia (`/provincia/milano`, 107 slug generati staticamente da
+  `generateStaticParams`, contenuto letto a ogni richiesta via
+  `force-dynamic`, stesso pattern di `/paese/[slug]`). Mostra self,
+  servito, differenza fra i due, media nazionale e posizione in classifica
+  fra le 107 — non la scomposizione fiscale: l'accisa è uguale in tutta
+  Italia, ripeterla per provincia non direbbe niente di nuovo, e la pagina
+  lo dice esplicitamente con un link a `/paese/italia`. Se lo slug è valido
+  ma manca ancora un prezzo, mostra una pagina onesta invece di un 404,
+  stesso principio di `/paese/[slug]`.
+  `src/lib/italianFuelStats.ts` (nuovo file, non un'estensione di
+  `europeFuelStats.ts`: le due fonti danno dati di forma diversa — MIMIT
+  non ha un prezzo netto da cui sottrarre) — `computeItalianFuelStats`
+  ricostruisce il dato per provincia e la media nazionale; **la media è
+  PESATA sul numero di impianti di ciascuna provincia**, a differenza della
+  media "semplice" dei 27 paesi UE: lì non abbiamo i consumi reali per
+  pesarla, qui invece il conteggio impianti è un dato che già salviamo
+  (trasparenza sul campione), quindi ignorarlo come peso sarebbe stato lo
+  scarto meno onesto, non il più semplice. `rankByPrice` usa la stessa
+  convenzione di `rankByTaxShare` (rank 1 = valore più alto, qui il prezzo
+  più caro). `src/lib/db/queries.ts` ha una nuova
+  `getLatestItalianFuelPrices()` (stesso pattern di dedup di
+  `getLatestFuelPrices`, su chiave provincia+carburante). `src/lib/sources.ts`
+  ha una nuova voce `mimit` (`kind: "primaria"` — ente pubblico con mandato
+  di legge, stessa categoria di Commissione Europea/EIA) e
+  `src/lib/freshness/config.ts` una entry `mimit` (1 giorno atteso, 2 di
+  grace — più stretta delle fonti settimanali perché una cadenza
+  giornaliera che salta un giorno è già un segnale).
+  **Ancora da fare**: un vero cron schedulato (oggi è uno script manuale,
+  coerente con "non prima di uno sprint libero" della roadmap) e un link
+  verso le pagine provincia da qualche punto della UI (oggi si raggiungono
+  solo digitando l'URL — nessuna mappa o tabella le collega ancora)
 - **Scomposizione fiscale — FATTA** (3 set 2026), ed è il contenuto che
   differenzia il sito. Il numero, sui dati del 31 agosto: dei 177 millesimi
   che l'Italia paga sopra la media dei 27, **155 sono imposte e 22 sono il

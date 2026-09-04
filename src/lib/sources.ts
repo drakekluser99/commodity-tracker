@@ -12,7 +12,7 @@
 
 export type SourceKind = "primaria" | "aggregata";
 
-export type SourceId = "eu-commission" | "eia" | "alpha-vantage";
+export type SourceId = "eu-commission" | "eia" | "alpha-vantage" | "mimit";
 
 type SourceMeta = {
   /** Nome per esteso, usato nel testo delle note "Fonte:". */
@@ -32,6 +32,13 @@ export const SOURCES: Record<SourceId, SourceMeta> = {
   "alpha-vantage": {
     label: "Alpha Vantage",
     kind: "aggregata",
+  },
+  // Fase 4: dati stazione-per-stazione aggregati per provincia. Ente
+  // pubblico con mandato di legge sulla raccolta, non un intermediario
+  // commerciale — stessa categoria di Commissione Europea/EIA.
+  mimit: {
+    label: "MIMIT (Ministero delle Imprese e del Made in Italy)",
+    kind: "primaria",
   },
 };
 

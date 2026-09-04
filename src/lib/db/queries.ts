@@ -6,6 +6,8 @@ import {
   regions,
   retailFuelPrices,
   weeklyNarratives,
+  provinces,
+  retailFuelPricesIt,
 } from "./schema";
 
 export interface LatestCommodityPrice {
@@ -263,4 +265,51 @@ export async function getLatestWeeklyNarratives(): Promise<
     .from(weeklyNarratives)
     .where(eq(weeklyNarratives.weekOf, latest.weekOf))
     .orderBy(weeklyNarratives.kind);
+}
+
+export interface LatestProvinceFuelPrice {
+  provinceCode: string;
+  provinceName: string;
+  fuelType: string;
+  priceSelfAvg: string | null;
+  priceServedAvg: string | null;
+  selfStationCount: number | null;
+  servedStationCount: number | null;
+  recordedAt: Date;
+}
+
+/**
+ * Prezzo carburante più recente per ogni (provincia, carburante) — Fase 4.
+ * Stessa logica di dedup di getLatestFuelPrices: leggiamo ordinato dal più
+ * recente e teniamo solo la prima occorrenza per chiave. Con 107 province
+ * × 2 carburanti (214 righe attese per giorno) va benissimo in JavaScript,
+ * stessa scala di retailFuelPrices.
+ */
+export async function getLatestItalianFuelPrices(): Promise<
+  LatestProvinceFuelPrice[]
+> {
+  const rows = await db
+    .select({
+      provinceCode: provinces.code,
+      provinceName: provinces.name,
+      fuelType: retailFuelPricesIt.fuelType,
+      priceSelfAvg: retailFuelPricesIt.priceSelfAvg,
+      priceServedAvg: retailFuelPricesIt.priceServedAvg,
+      selfStationCount: retailFuelPricesIt.selfStationCount,
+      servedStationCount: retailFuelPricesIt.servedStationCount,
+      recordedAt: retailFuelPricesIt.recordedAt,
+    })
+    .from(retailFuelPricesIt)
+    .innerJoin(provinces, eq(retailFuelPricesIt.provinceId, provinces.id))
+    .orderBy(desc(retailFuelPricesIt.recordedAt));
+
+  const seen = new Set<string>();
+  const latest: LatestProvinceFuelPrice[] = [];
+  for (const row of rows) {
+    const key = `${row.provinceCode}:${row.fuelType}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    latest.push(row);
+  }
+  return latest;
 }
