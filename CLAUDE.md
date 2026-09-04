@@ -53,9 +53,10 @@ ogni dato deve avere fonte, data, e limiti dichiarati esplicitamente.
   `retail_fuel_prices` hanno sia `recorded_at` (data DEL DATO) sia
   `retrieved_at` (quando il fetcher l'ha acquisito, nullable): due cose
   diverse, servono per distinguere "fonte ferma" da "fonte che non ha
-  ancora pubblicato". Migrazioni applicate al DB Neon fino alla `0008`
+  ancora pubblicato". Migrazioni applicate al DB Neon fino alla `0009`
   (4 set 2026: `0006`/`0007` aggiungono `weekly_narratives`, `0008`
-  aggiunge `excise_eur`/`vat_rate_percent`). Storico: `retrieved_at` è
+  aggiunge `excise_eur`/`vat_rate_percent`, `0009` aggiunge `provinces` e
+  `retail_fuel_prices_it`, Fase 4). Storico: `retrieved_at` è
   `NULL` per le righe salvate prima della
   `0004` e si popola dal primo run successivo di ogni cron; `fetch_runs`
   parte vuota e si riempie allo stesso modo. `regions.name` ha un vincolo
@@ -881,21 +882,63 @@ ponderata, import massivo storico, estrapolazioni causali.
     self-service — stesso distributore può avere due prezzi), `dtComu`
     (timestamp di comunicazione del gestore, non "le 8 di mattina" per
     ogni riga nonostante il nome del file)
-  **Aperto, da chiudere prima di scrivere codice**: il volume reale
-  (migliaia di impianti attivi in Italia, verosimilmente 4-5 righe prezzo
-  per impianto/giorno tra carburanti e self/servito — va MISURATO
-  scaricando i file per intero, non stimato da un estratto) e se serve
-  un'aggregazione provinciale lato cron invece di tenere ogni stazione in
-  `price_history`/`retail_fuel_prices` (probabile, per non far esplodere
-  la tabella — vedi anche il vincolo sotto). **Nota tecnica**: questo
-  dominio (`mimit.gov.it`) non è raggiungibile dalla rete in sandbox del
-  container cloud di Claude (egress bloccato per policy) — il download
-  vero va fatto dal cron su Vercel o dal PC dell'utente, non testato da
-  qui. Richiede un modello di regione GERARCHICO (oggi `regions` è
-  piatto: paese, non paese→provincia→comune) + retention + tabelle
-  dedicate. Dipende dalla Fase 2 (le pagine paese devono esistere come
-  pattern prima di replicarlo a `/provincia/[slug]`) — progetto separato
-  con la sua fase di design
+  **Volume MISURATO il 4 set 2026** (scaricando i file per intero dal PC
+  dell'utente, non stimato): 23.981 impianti attivi, 93.068 righe prezzo
+  nell'estrazione del giorno — che salvate una per una farebbero ~34
+  milioni di righe/anno, contro le ~28.000 di dieci anni di storico UE.
+  **Decisione presa**: aggregazione per PROVINCIA (107, non i ~7.900
+  comuni — troppo pochi impianti a comune, ~3 in media, per una media
+  onesta) calcolata a livello di cron, riga per stazione mai salvata.
+  Modello dati: tabella `provinces` SEPARATA da `regions` (non una
+  gerarchia sulla tabella esistente — vedi schema.ts sopra), self e
+  servito su due colonne distinte (in Italia il self costa quasi sempre
+  meno, una media dei due sarebbe un prezzo che nessuno paga davvero).
+  **Nota tecnica**: `mimit.gov.it` non è raggiungibile dalla rete del
+  container cloud di Claude (egress bloccato per policy) — il download va
+  fatto dal PC dell'utente o, più avanti, da un cron Vercel.
+  **Scritto E VERIFICATO contro il file reale (4 set 2026)**:
+  - `src/lib/provinces.ts` — le 107 province ISTAT, sigla → nome → slug,
+    stessa impostazione manuale di `countries.ts`. Confermate tutte e 107
+    le sigle reali del CSV, zero sconosciute dopo il fix sotto
+  - `src/lib/db/schema.ts` — tabelle `provinces` (anagrafica minima,
+    sigla+nome) e `retail_fuel_prices_it` (medie giornaliere per
+    provincia×carburante×self/servito, con conteggio impianti per
+    trasparenza sul campione) — migrazione `0009` generata e applicata
+  - `src/lib/fetchers/mimit.ts` — `fetchAndAggregateMimit()`: scarica i
+    due CSV, decodifica UTF-8 con fallback Windows-1252 (verificato:
+    questo file è in UTF-8 vero, "CITTÀ SANT'ANGELO" arriva senza
+    corruzione — il fallback resta per sicurezza, non ancora scattato),
+    salta le due righe di intestazione (`Estrazione del...` + header
+    colonne), filtra a `benzina`/`gasolio` standard (57 varianti
+    brandizzate/altri carburanti scartate correttamente, es. "Blue
+    Diesel", "HVOlution", GPL, Metano) e aggrega per
+    provincia×carburante×self/servito.
+    **Bug intercettato e corretto al primo lancio reale**: Provincia
+    NON si legge da un indice fisso (colonna 7) — alcune righe
+    dell'anagrafica hanno un numero di campi diverso da 10 (indirizzi o
+    nomi impianto con un `|` residuo, nonostante il cambio di separatore
+    di febbraio 2026), e un indice fisso dall'inizio leggeva un pezzo di
+    indirizzo o il nome del Comune al posto della sigla su quelle righe
+    (60 sigle sconosciute, 113 impianti scartati, 426 righe prezzo
+    "orfane" al primo giro). Corretto leggendo Provincia/Latitudine/
+    Longitudine dal FONDO della riga (`row[row.length - 3]` ecc.): sono
+    sempre le ultime tre colonne qualunque cosa succeda prima. Dopo il
+    fix: 23.981/23.981 impianti riconosciuti, 0 sigle sconosciute, 0
+    righe orfane, 428/428 combinazioni provincia×carburante×self/servito
+    possibili tutte presenti — il campione più pulito di qualunque fonte
+    finora integrata
+  - `src/lib/fetchers/saveMimitPrices.ts` — upsert su `provinces` (tutte e
+    107, sempre) poi su `retail_fuel_prices_it` a blocchi da 500. Primo
+    salvataggio reale: **214 righe** (107 province × 2 carburanti, self e
+    servito nella stessa riga come da schema)
+  - `scripts/inspect-mimit.ts` — `npx tsx scripts/inspect-mimit.ts`
+    (contatori, nessuna scrittura) / `--save` (scrive). Il flusso
+    dry-run-poi-save ha trovato il bug sopra PRIMA che toccasse il
+    database — esattamente il motivo per cui esiste in due modalità
+  **Ancora da fare**: `/provincia/[slug]` (Fase 2 ne è il pattern) e —
+  solo più avanti — un vero cron schedulato (oggi è uno script manuale,
+  coerente con "non prima di uno sprint libero" della roadmap). Nessuna
+  pagina pubblica mostra ancora questo dato: è in tabella ma non in UI
 - **Scomposizione fiscale — FATTA** (3 set 2026), ed è il contenuto che
   differenzia il sito. Il numero, sui dati del 31 agosto: dei 177 millesimi
   che l'Italia paga sopra la media dei 27, **155 sono imposte e 22 sono il
