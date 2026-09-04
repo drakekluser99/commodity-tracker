@@ -113,6 +113,19 @@ export const retailFuelPrices = pgTable(
     // Solo la fonte `eu_weekly_oil_bulletin` la valorizza: l'EIA pubblica
     // il prezzo alla pompa e basta.
     priceNet: numeric("price_net", { precision: 10, scale: 4 }),
+    // Accisa, in euro al litro — Fase 3 della roadmap. Dal foglio "Excise
+    // duties" del file storico UE, già convertita da valuta nazionale a
+    // euro dal fetcher (vedi euOilBulletinHistory.ts). Nullable come
+    // priceNet: solo `eu_weekly_oil_bulletin` la valorizza, e non per ogni
+    // paese/settimana (il foglio delle accise non copre sempre tutto lo
+    // storico dal 2005).
+    exciseEur: numeric("excise_eur", { precision: 10, scale: 4 }),
+    // Aliquota IVA in percentuale (es. 22.000), dal foglio "VAT". Si salva
+    // l'ALIQUOTA e non l'importo in euro: l'importo si deriva a valle come
+    // (price_net + excise_eur) * vat_rate_percent / 100 — così se la
+    // formula di derivazione cambia un giorno non serve ricalcolare e
+    // riscrivere ogni riga già salvata.
+    vatRatePercent: numeric("vat_rate_percent", { precision: 6, scale: 3 }),
     currency: varchar("currency", { length: 3 }).notNull(), // ISO 4217, es. "EUR", "USD"
     unit: varchar("unit", { length: 16 }).notNull().default("liter"), // "liter" | "gallon"
     // Vedi price_history.retrievedAt: data del dato vs data di acquisizione.

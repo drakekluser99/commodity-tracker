@@ -47,8 +47,11 @@ export async function saveEuFuelPrices(
         fuelType: point.fuelType,
         price: point.pricePerLiter.toString(),
         // `?? null` e non `?.toString()`: un netto assente deve restare NULL
-        // in colonna, non diventare la stringa "undefined".
+        // in colonna, non diventare la stringa "undefined". Stessa logica
+        // per accisa e IVA, aggiunte in Fase 3.
         priceNet: point.priceNetPerLiter?.toString() ?? null,
+        exciseEur: point.exciseEurPerLiter?.toString() ?? null,
+        vatRatePercent: point.vatRatePercent?.toString() ?? null,
         currency: point.currency,
         unit: "liter",
         recordedAt: new Date(point.date),
@@ -64,6 +67,8 @@ export async function saveEuFuelPrices(
         set: {
           price: point.pricePerLiter.toString(),
           priceNet: point.priceNetPerLiter?.toString() ?? null,
+          exciseEur: point.exciseEurPerLiter?.toString() ?? null,
+          vatRatePercent: point.vatRatePercent?.toString() ?? null,
           currency: point.currency,
           retrievedAt,
           source,

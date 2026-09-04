@@ -69,6 +69,14 @@ const EU_HISTORY_URL =
 
 const SHEET_WITH_TAX = "Prices with taxes";
 const SHEET_WITHOUT_TAX = "Prices wo taxes";
+// Fase 3 della roadmap: split accisa/IVA. Struttura osservata con
+// scripts/inspect-eu-history-taxes.ts (3-4 set 2026) — vedi il commento
+// sopra readTaxEventSheet per il layout. Deliberatamente NON leggiamo
+// "Excise duties - components" (bio/fossile, troppo dettaglio) né "Other
+// Indirect Taxes" (quello che resta va in un residuo "altre imposte",
+// gross - net - accisa - IVA, invece di un sesto foglio da mantenere).
+const SHEET_VAT = "VAT";
+const SHEET_EXCISE = "Excise duties";
 
 /**
  * Codice ISO usato dal file → nome del paese come sta in `regions.name`.
@@ -129,6 +137,34 @@ export interface EuFuelHistoryPoint {
    * fiscale NON si calcola, e non va inventato per differenza da una media.
    */
   priceNetPerLiter: number | null;
+  /**
+   * Accisa, in euro al litro, dal foglio "Excise duties". `null` quando non
+   * c'è un'aliquota nota per quel paese/prodotto a quella data (il foglio
+   * comincia più tardi del 2005 per alcuni paesi, o il prodotto non è
+   * tracciato). Il foglio esprime l'accisa in valuta NAZIONALE: qui è già
+   * convertita in euro usando il tasso di cambio della stessa settimana
+   * (le colonne `XX_exchange_rate` del foglio prezzi) — 1 per i paesi già
+   * in euro quella settimana.
+   *
+   * Limite noto e accettato: per un paese che è passato all'euro durante i
+   * vent'anni di storico, una riga di accisa datata PRIMA dell'adozione ma
+   * ancora in vigore DOPO (nessuna riga nuova nel foglio a quella data)
+   * verrebbe convertita con il tasso attuale (1) invece che con quello
+   * storico. Casi rari — riguardano solo le settimane a cavallo
+   * dell'adozione dell'euro in un singolo paese — non corretti qui perché
+   * richiederebbero di rincorrere il tasso di cambio "since"-per-"since"
+   * invece che settimana-per-settimana, per un guadagno di precisione
+   * minimo sui dati che contano davvero (quelli recenti).
+   */
+  exciseEurPerLiter: number | null;
+  /**
+   * Aliquota IVA in percentuale (es. 22 per il 22%), dal foglio "VAT".
+   * `null` con lo stesso significato di sopra. Si salva l'ALIQUOTA, non
+   * l'importo: l'importo in euro si calcola a valle come
+   * (netto + accisa) * aliquota / 100, che è come l'IVA sui carburanti si
+   * applica per legge nell'UE (sul prezzo comprensivo di accisa).
+   */
+  vatRatePercent: number | null;
   currency: "EUR";
   date: string; // YYYY-MM-DD
 }
@@ -159,6 +195,9 @@ export function parseWorkbook(
 ): EuFuelHistoryPoint[] {
   const gross = readSheet(workbook, SHEET_WITH_TAX, "price_with_tax");
   const net = readSheet(workbook, SHEET_WITHOUT_TAX, "price_wo_tax");
+  const exchangeRates = readExchangeRates(workbook, SHEET_WITH_TAX);
+  const vatEvents = readTaxEventSheet(workbook, SHEET_VAT);
+  const exciseEvents = readTaxEventSheet(workbook, SHEET_EXCISE);
 
   // Le date vengono dal foglio dei prezzi alla pompa: è quello che
   // determina cosa esiste. Se il foglio dei netti non ha una settimana, il
@@ -173,20 +212,38 @@ export function parseWorkbook(
   for (const date of dates) {
     const grossRow = gross.get(date)!;
     const netRow = net.get(date);
+    const ratesRow = exchangeRates.get(date);
 
     for (const [code, countryName] of Object.entries(COUNTRY_BY_CODE)) {
       for (const fuelType of ["petrol", "diesel"] as const) {
-        const key = `${code}|${PRODUCT_BY_FUEL[fuelType]}`;
+        const product = PRODUCT_BY_FUEL[fuelType];
+        const key = `${code}|${product}`;
         const grossValue = grossRow.get(key);
         if (grossValue === undefined) continue;
 
         const netValue = netRow?.get(key);
+
+        // Tasso di cambio della STESSA settimana del prezzo che stiamo
+        // convertendo (non della data "since" dell'aliquota): è quello che
+        // serve per portare un importo in valuta nazionale a euro in quel
+        // preciso momento. 1 se il paese non ha colonna di cambio quella
+        // settimana (già in euro).
+        const exchangeRate = ratesRow?.get(code) ?? 1;
+        const exciseNational = valueAsOf(exciseEvents.get(code), product, date);
+        const exciseEurPerLiter =
+          exciseNational === null
+            ? null
+            : (exciseNational * exchangeRate) / LITERS_PER_UNIT;
+        const vatRatePercent = valueAsOf(vatEvents.get(code), product, date);
+
         points.push({
           countryName,
           fuelType,
           pricePerLiter: grossValue / LITERS_PER_UNIT,
           priceNetPerLiter:
             netValue === undefined ? null : netValue / LITERS_PER_UNIT,
+          exciseEurPerLiter,
+          vatRatePercent,
           currency: "EUR",
           date,
         });
@@ -195,6 +252,146 @@ export function parseWorkbook(
   }
 
   return points;
+}
+
+/**
+ * Tassi di cambio verso l'euro, settimana per settimana, letti dalle
+ * colonne `XX_exchange_rate` del foglio dei prezzi lordi (le uniche a
+ * portarli: VAT ed Excise duties non li ripetono).
+ *
+ * Un paese senza quella colonna era già in euro quella settimana: la mappa
+ * restituisce 1 per lui, così moltiplicare per il tasso è sempre corretto
+ * indipendentemente dalla valuta, invece di dover ramificare "se ha la
+ * colonna... altrimenti..." a ogni punto di uso.
+ */
+function readExchangeRates(
+  workbook: ExcelJS.Workbook,
+  sheetName: string
+): Map<string, Map<string, number>> {
+  const sheet = workbook.getWorksheet(sheetName);
+  if (!sheet) {
+    throw new Error(`Foglio "${sheetName}" non trovato nel file storico UE.`);
+  }
+
+  const headerRow = sheet.getRow(1);
+  const columnByCode = new Map<string, number>();
+  headerRow.eachCell((cell, colNumber) => {
+    const raw = String(cell.value ?? "").trim();
+    for (const code of Object.keys(COUNTRY_BY_CODE)) {
+      if (raw === `${code}_exchange_rate`) columnByCode.set(code, colNumber);
+    }
+  });
+
+  const byDate = new Map<string, Map<string, number>>();
+  sheet.eachRow((row, rowNumber) => {
+    if (rowNumber <= 3) return;
+    const date = asIsoDate(row.getCell(1).value);
+    if (!date) return;
+
+    const rates = new Map<string, number>();
+    for (const code of Object.keys(COUNTRY_BY_CODE)) {
+      const col = columnByCode.get(code);
+      const rate = col !== undefined ? asNumber(row.getCell(col).value) : null;
+      rates.set(code, rate ?? 1);
+    }
+    byDate.set(date, rates);
+  });
+
+  return byDate;
+}
+
+/**
+ * Un evento di variazione di aliquota/importo, dai fogli "VAT" o
+ * "Excise duties" (stesso layout in entrambi).
+ */
+interface TaxEvent {
+  sinceDate: string; // YYYY-MM-DD, in vigore da questa data in poi
+  valuesByProduct: Map<string, number>; // "euro95" | "diesel" -> valore
+}
+
+/**
+ * Legge un foglio A EVENTI: non una riga per settimana come i prezzi, ma
+ * una riga solo quando l'aliquota/l'importo CAMBIA. Layout osservato (3-4
+ * set 2026, scripts/inspect-eu-history-taxes.ts):
+ *
+ *   Riga 1: titolo (es. "VAT (Value added tax), %")
+ *   Riga 2: "CTR" da sola
+ *   Riga 3: null, "Since:", poi un'etichetta prodotto per colonna
+ *   Riga 4: unità di misura
+ *   Riga 5+: <codice paese o vuoto>, <data "since">, valore benzina,
+ *            valore diesel, ... (colonne 1-4 sono quelle che usiamo)
+ *
+ * Il codice paese (col. 1) compare SOLO sulla prima riga del blocco di
+ * quel paese — è una cella "unita" nell'export Excel — poi resta vuoto
+ * finché non cambia paese. Il parser deve ricordarsi l'ultimo codice
+ * visto, non aspettarsi che sia sempre presente. Le righe sono in ordine
+ * decrescente per data (la più recente per prima, come nei fogli prezzo):
+ * si riordina esplicitamente invece di fare affidamento sull'ordine del
+ * file, che potrebbe cambiare.
+ */
+function readTaxEventSheet(
+  workbook: ExcelJS.Workbook,
+  sheetName: string
+): Map<string, TaxEvent[]> {
+  const sheet = workbook.getWorksheet(sheetName);
+  if (!sheet) {
+    throw new Error(`Foglio "${sheetName}" non trovato nel file storico UE.`);
+  }
+
+  const eventsByCode = new Map<string, TaxEvent[]>();
+  let currentCode: string | null = null;
+
+  sheet.eachRow((row, rowNumber) => {
+    if (rowNumber <= 4) return; // intestazioni
+
+    const codeCell = String(row.getCell(1).value ?? "").trim();
+    if (codeCell) {
+      const code = codeCell.replace(/_$/, ""); // "AT_" -> "AT"
+      currentCode = COUNTRY_BY_CODE[code] ? code : null; // ignora righe fuori dai 27 (es. UK_)
+    }
+    if (!currentCode) return;
+
+    const sinceDate = asIsoDate(row.getCell(2).value);
+    if (!sinceDate) return; // righe vuote o di disclaimer in fondo al foglio
+
+    const values = new Map<string, number>();
+    const petrol = asNumber(row.getCell(3).value);
+    const diesel = asNumber(row.getCell(4).value);
+    if (petrol !== null) values.set("euro95", petrol);
+    if (diesel !== null) values.set("diesel", diesel);
+    if (values.size === 0) return;
+
+    const list = eventsByCode.get(currentCode) ?? [];
+    list.push({ sinceDate, valuesByProduct: values });
+    eventsByCode.set(currentCode, list);
+  });
+
+  for (const list of eventsByCode.values()) {
+    list.sort((a, b) => a.sinceDate.localeCompare(b.sinceDate));
+  }
+
+  return eventsByCode;
+}
+
+/**
+ * Il valore in vigore per un prodotto a una certa data: l'ultimo evento
+ * con `sinceDate` minore o uguale alla data cercata. `null` se la data è
+ * precedente al primo evento noto (nessuna aliquota risalibile) o se il
+ * paese non ha eventi per quel prodotto.
+ */
+function valueAsOf(
+  events: TaxEvent[] | undefined,
+  product: string,
+  date: string
+): number | null {
+  if (!events || events.length === 0) return null;
+  let result: number | null = null;
+  for (const event of events) {
+    if (event.sinceDate > date) break;
+    const value = event.valuesByProduct.get(product);
+    if (value !== undefined) result = value;
+  }
+  return result;
 }
 
 /**

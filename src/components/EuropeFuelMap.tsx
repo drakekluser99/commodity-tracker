@@ -26,6 +26,13 @@ export interface CountryFuelData {
    */
   petrolNet: number | null;
   dieselNet: number | null;
+  /**
+   * Accisa, euro al litro — Fase 3. `null` dove il foglio "Excise duties"
+   * non copre quel paese in quella settimana: stessa logica di petrolNet,
+   * niente non è zero.
+   */
+  petrolExciseEur: number | null;
+  dieselExciseEur: number | null;
 }
 
 interface Props {
@@ -79,7 +86,7 @@ const NO_DATA_FILL = "#f0ebe0"; // system-border-subtle — fallback "nessun dat
  * lo renderebbero impossibile da serializzare.
  */
 type FuelKey = "petrol" | "diesel";
-type MeasureKey = "price" | "taxShare";
+type MeasureKey = "price" | "taxShare" | "excise";
 
 const FUELS: ReadonlyArray<{ key: FuelKey; label: string }> = [
   { key: "petrol", label: "Benzina" },
@@ -113,6 +120,10 @@ const MEASURES: ReadonlyArray<{
     unit: "%",
     format: (v) => v.toLocaleString("it-IT", { maximumFractionDigits: 1 }),
   },
+  // Terza voce — Fase 3 della roadmap, esattamente il tipo di aggiunta per
+  // cui questo registro esiste: una riga in più, non una riscrittura del
+  // componente (vedi il commento sopra MEASURES).
+  { key: "excise", label: "Accisa", unit: "€/L", format: formatFuelPrice },
 ];
 
 /**
@@ -131,6 +142,11 @@ function metricValue(
   const gross = data[fuel];
   if (gross === null || !Number.isFinite(gross)) return null;
   if (measure === "price") return gross;
+
+  if (measure === "excise") {
+    const excise = fuel === "petrol" ? data.petrolExciseEur : data.dieselExciseEur;
+    return excise !== null && Number.isFinite(excise) ? excise : null;
+  }
 
   const net = fuel === "petrol" ? data.petrolNet : data.dieselNet;
   if (net === null || !Number.isFinite(net) || gross <= 0) return null;
@@ -232,14 +248,6 @@ export default function EuropeFuelMap({ prices, euAverage }: Props) {
    * pesano Malta e la Germania allo stesso modo, e sono numeri diversi.
    * La prima è quella che la riga sotto la mappa afferma.
    */
-  const average = useMemo(() => {
-    if (measure === "price") return euAverage[fuel];
-    const gross = euAverage[fuel];
-    const net = fuel === "petrol" ? euAverage.petrolNet : euAverage.dieselNet;
-    if (gross === null || net === null || gross <= 0) return null;
-    return ((gross - net) / gross) * 100;
-  }, [euAverage, fuel, measure]);
-
   const stats = useMemo(() => {
     const withValue = prices
       .map((p) => ({ country: p, value: metricValue(p, fuel, measure) }))
@@ -263,6 +271,29 @@ export default function EuropeFuelMap({ prices, euAverage }: Props) {
       byCountry: new Map(withValue.map((r) => [r.country.countryName, r.value])),
     };
   }, [prices, fuel, measure]);
+
+  /**
+   * Il centro della scala divergente. Vedi il commento originale su
+   * `measure === "taxShare"`: per prezzo e quota fiscale è ancora la media
+   * UE calcolata in page.tsx (o la sua quota derivata). Per l'accisa non
+   * arriva da `euAverage` — richiederebbe di allargare quel prop per una
+   * sola misura — ma dalla media SEMPLICE dei paesi visibili in `stats`,
+   * calcolata qui: coerente con "media dei 27" ovunque nel sito, e non
+   * serve altro perché l'accisa, a differenza della quota fiscale, non ha
+   * un doppio significato "media della quota" vs "quota della media".
+   */
+  const average = useMemo(() => {
+    if (measure === "price") return euAverage[fuel];
+    if (measure === "excise") {
+      if (!stats || stats.byCountry.size === 0) return null;
+      const values = [...stats.byCountry.values()];
+      return values.reduce((sum, v) => sum + v, 0) / values.length;
+    }
+    const gross = euAverage[fuel];
+    const net = fuel === "petrol" ? euAverage.petrolNet : euAverage.dieselNet;
+    if (gross === null || net === null || gross <= 0) return null;
+    return ((gross - net) / gross) * 100;
+  }, [euAverage, fuel, measure, stats]);
 
   const dataByCountry = useMemo(
     () => new Map(prices.map((p) => [p.countryName, p])),

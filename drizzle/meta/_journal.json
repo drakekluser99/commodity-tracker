@@ -57,6 +57,13 @@
       "when": 1788465161048,
       "tag": "0007_wandering_khan",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788507405390,
+      "tag": "0008_new_night_thrasher",
+      "breakpoints": true
     }
   ]
 }

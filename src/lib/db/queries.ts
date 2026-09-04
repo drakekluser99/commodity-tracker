@@ -32,6 +32,14 @@ export interface LatestFuelPrice {
    * non stimarlo per differenza da una media.
    */
   priceNet: string | null;
+  /**
+   * Accisa (euro/litro) e aliquota IVA (%), Fase 3. Stesso significato di
+   * `priceNet`: valorizzate solo da `eu_weekly_oil_bulletin`, e non per
+   * ogni paese/settimana — `null` dove il foglio delle accise/IVA non
+   * copre quella combinazione.
+   */
+  exciseEur: string | null;
+  vatRatePercent: string | null;
   currency: string;
   recordedAt: Date;
 }
@@ -83,6 +91,8 @@ export async function getLatestFuelPrices(): Promise<LatestFuelPrice[]> {
       fuelType: retailFuelPrices.fuelType,
       price: retailFuelPrices.price,
       priceNet: retailFuelPrices.priceNet,
+      exciseEur: retailFuelPrices.exciseEur,
+      vatRatePercent: retailFuelPrices.vatRatePercent,
       currency: retailFuelPrices.currency,
       recordedAt: retailFuelPrices.recordedAt,
     })

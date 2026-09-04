@@ -266,12 +266,17 @@ async function backfillEuFuel(opts: { fromDate?: string; dryRun: boolean }) {
   const points = await fetchEuFuelHistory({ fromDate });
   const dates = [...new Set(points.map((p) => p.date))].sort();
   const conNetto = points.filter((p) => p.priceNetPerLiter !== null).length;
+  const conAccisa = points.filter((p) => p.exciseEurPerLiter !== null).length;
+  const conIva = points.filter((p) => p.vatRatePercent !== null).length;
 
   console.log(
     `  ${points.length} rilevazioni  ${dates[0]} → ${dates[dates.length - 1]}  (${dates.length} settimane)`
   );
   console.log(
     `  con prezzo netto: ${conNetto} su ${points.length} — le altre non avranno scomposizione fiscale`
+  );
+  console.log(
+    `  con accisa: ${conAccisa} su ${points.length} · con aliquota IVA: ${conIva} su ${points.length}`
   );
 
   if (opts.dryRun) {
@@ -294,6 +299,8 @@ async function backfillEuFuel(opts: { fromDate?: string; dryRun: boolean }) {
       fuelType: p.fuelType,
       pricePerLiter: p.pricePerLiter,
       priceNetPerLiter: p.priceNetPerLiter,
+      exciseEurPerLiter: p.exciseEurPerLiter,
+      vatRatePercent: p.vatRatePercent,
       currency: p.currency,
       date: p.date,
     })),
