@@ -46,14 +46,22 @@ export async function runMarketPriceCron(
 
   try {
     const points = await fetchCommodityBatch(batch, apiKey);
-    const saved = await savePricePoints(points, "alpha_vantage");
+    const { saved, latestRecordedAt } = await savePricePoints(
+      points,
+      "alpha_vantage",
+      runId
+    );
 
     // `ok: true` = il run è arrivato in fondo senza eccezioni. NON vuol
     // dire "tutto salvato": se Alpha Vantage risponde con un rate limit
     // (HTTP 200 + campo Information) `fetchCommodityBatch` scarta quei
     // punti e `saved` può essere < di quanti ne attendevamo. Quel
     // confronto lo fa chi legge fetch_runs.
-    await finishFetchRun(runId, { ok: true, pointsSaved: saved });
+    await finishFetchRun(runId, {
+      ok: true,
+      pointsSaved: saved,
+      latestRecordedAt,
+    });
     return NextResponse.json({ ok: true, batch: batchLabel, saved });
   } catch (err) {
     console.error(`Errore nel cron fetch-market-prices-${batchLabel}:`, err);

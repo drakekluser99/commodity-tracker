@@ -33,9 +33,17 @@ export async function GET(request: NextRequest) {
 
   try {
     const points = await fetchUsFuelPrices(apiKey);
-    const saved = await saveUsFuelPrices(points, SOURCE);
+    const { saved, latestRecordedAt } = await saveUsFuelPrices(
+      points,
+      SOURCE,
+      runId
+    );
 
-    await finishFetchRun(runId, { ok: true, pointsSaved: saved });
+    await finishFetchRun(runId, {
+      ok: true,
+      pointsSaved: saved,
+      latestRecordedAt,
+    });
     return NextResponse.json({ ok: true, saved });
   } catch (err) {
     console.error("Errore nel cron fetch-us-fuel-prices:", err);

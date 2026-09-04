@@ -14,6 +14,14 @@ import { averagePrice, type MimitFetchResult } from "./mimit";
  * quindi si upsertano tutte una volta, indipendentemente da quali sigle
  * compaiono nell'estrazione di oggi. Così una provincia temporaneamente
  * senza impianti in un CSV non sparisce dal registro.
+ *
+ * Non scrive in `data_corrections` (Fase 3, vedi schema.ts): ogni riga qui
+ * è un'estrazione giornaliera indipendente, non la revisione di un dato già
+ * pubblicato per la stessa data — a differenza del bollettino UE, che può
+ * rivedere una settimana passata, il MIMIT non "corregge" il giorno prima,
+ * pubblica il giorno dopo. Se questo cron girasse due volte nello stesso
+ * giorno l'upsert aggiornerebbe comunque la media silenziosamente: è la
+ * stessa estrazione vista due volte, non una correzione della fonte.
  */
 export async function saveMimitPrices(result: MimitFetchResult, source: string) {
   const retrievedAt = new Date();

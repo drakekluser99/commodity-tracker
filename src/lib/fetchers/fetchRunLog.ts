@@ -31,7 +31,15 @@ export async function startFetchRun(
 
 export async function finishFetchRun(
   id: number | null,
-  result: { ok: boolean; pointsSaved?: number; errorText?: string }
+  result: {
+    ok: boolean;
+    pointsSaved?: number;
+    // La recordedAt più recente fra i punti effettivamente salvati in
+    // questo run — non "adesso". Opzionale: un run fallito prima di
+    // salvare nulla, o un fetcher che non la calcola ancora, non ce l'ha.
+    latestRecordedAt?: Date | null;
+    errorText?: string;
+  }
 ): Promise<void> {
   if (id === null) return;
   try {
@@ -41,6 +49,7 @@ export async function finishFetchRun(
         finishedAt: new Date(),
         ok: result.ok,
         pointsSaved: result.pointsSaved ?? null,
+        latestRecordedAt: result.latestRecordedAt ?? null,
         errorText: result.errorText ?? null,
       })
       .where(eq(fetchRuns.id, id));

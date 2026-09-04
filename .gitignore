@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# scratch locale delle sessioni Claude/Cowork — non è codice del progetto,
+# e "Claude outputs/env.local" (senza il punto iniziale: NON combacia con
+# ".env*" qui sopra) è quasi finito nel commit di Fase 3 con dentro
+# DATABASE_URL, CRON_SECRET e le chiavi API vere. Intercettato prima del
+# commit, mai stato in git — ma la cartella va esclusa per intero.
+/Claude outputs/

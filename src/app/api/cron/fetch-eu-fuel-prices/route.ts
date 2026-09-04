@@ -40,7 +40,11 @@ export async function GET(request: NextRequest) {
     // righe per aggiornarne 54 — inutile, e su `neon-http` lentissimo. Lo
     // storico completo lo carica una tantum scripts/backfill.ts.
     const points = await fetchEuFuelHistory({ latestOnly: true });
-    const saved = await saveEuFuelPrices(points, SOURCE);
+    const { saved, latestRecordedAt } = await saveEuFuelPrices(
+      points,
+      SOURCE,
+      runId
+    );
 
     // "Cosa è cambiato questa settimana": generata DOPO il salvataggio,
     // confrontando le due settimane più recenti ora in tabella (quella
@@ -63,7 +67,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    await finishFetchRun(runId, { ok: true, pointsSaved: saved });
+    await finishFetchRun(runId, {
+      ok: true,
+      pointsSaved: saved,
+      latestRecordedAt,
+    });
     return NextResponse.json({ ok: true, saved });
   } catch (err) {
     console.error("Errore nel cron fetch-eu-fuel-prices:", err);

@@ -171,12 +171,82 @@ export const fetchRuns = pgTable(
     finishedAt: timestamp("finished_at"), // null = run ancora in corso o interrotta
     ok: boolean("ok"), // null finché non finita
     pointsSaved: integer("points_saved"),
+    // La `recordedAt` più recente fra i punti salvati in QUESTO run — non
+    // "adesso" (quello è `finishedAt`), ma la data del dato più fresco che
+    // la fonte ci ha dato. Serve a Fase 3 (registro correzioni): distingue
+    // "la fonte non pubblica da settimane" (`latestRecordedAt` fermo) da
+    // "il nostro cron non gira" (`finishedAt` assente). Nullable: un run
+    // fallito prima di salvare qualsiasi punto non ne ha uno, e le righe
+    // scritte prima di questa colonna non lo avranno mai.
+    latestRecordedAt: timestamp("latest_recorded_at"),
     errorText: text("error_text"),
   },
   (table) => ({
     sourceStartedIdx: index("fetch_runs_source_started_idx").on(
       table.source,
       table.startedAt
+    ),
+  })
+);
+
+/**
+ * DATA_CORRECTIONS
+ * Fase 3 della roadmap (igiene dei dati). Una riga ogni volta che un
+ * fetcher SOVRASCRIVE un valore già salvato con uno diverso — non la prima
+ * volta che un valore viene scritto (quella non corregge niente, riempie
+ * una casella vuota).
+ *
+ * Perché serve: gli upsert di questo progetto (vedi savePricePoints.ts,
+ * saveEuFuelPrices.ts...) sono pensati apposta per lasciare che una fonte
+ * corregga un dato già pubblicato — è un comportamento voluto, non un bug.
+ * Ma finora la correzione avveniva in silenzio: il valore vecchio spariva
+ * senza lasciare traccia. Se un domani un prezzo mostrato su una pagina
+ * paese cambia rispetto a ieri, oggi non c'è modo di distinguere "la fonte
+ * ha rivisto la settimana scorsa" da "abbiamo un bug nel parsing" — questa
+ * tabella è quella traccia.
+ *
+ * Generica per tabella e campo (non una tabella "price_history_corrections"
+ * più una "retail_fuel_prices_corrections"...) perché lo stesso identico
+ * evento — "un fetcher ha aggiornato un valore che esisteva già" — capita
+ * su più tabelle e più colonne (price, price_net, excise_eur,
+ * vat_rate_percent). Una tabella sola con `table_name`/`field` come stringhe
+ * evita di dover ripetere la stessa struttura quattro volte e rende la
+ * pagina "cosa è cambiato" (se un giorno servirà) una sola query invece di
+ * un'unione fra tabelle diverse.
+ *
+ * NON scritta per ogni fetcher: solo dove una "correzione" ha senso perché
+ * la stessa fonte pubblica ripetutamente la stessa data (Alpha Vantage, il
+ * bollettino UE, l'EIA). Il backfill storico e il cron MIMIT non la usano —
+ * vedi i commenti in savePricePointsBulk, saveRetailFuelPricesBulk e
+ * saveMimitPrices per il perché caso per caso.
+ */
+export const dataCorrections = pgTable(
+  "data_corrections",
+  {
+    id: serial("id").primaryKey(),
+    tableName: varchar("table_name", { length: 64 }).notNull(), // "price_history" | "retail_fuel_prices"
+    // Etichetta leggibile dell'entità corretta, es. "WTI" o "Germany petrol"
+    // — non un id numerico: questa tabella esiste per essere letta da un
+    // umano (o da una pagina "cosa è cambiato"), non solo interrogata.
+    entityLabel: text("entity_label").notNull(),
+    field: varchar("field", { length: 32 }).notNull(), // "price" | "price_net" | "excise_eur" | "vat_rate_percent"
+    oldValue: numeric("old_value", { precision: 12, scale: 4 }).notNull(),
+    newValue: numeric("new_value", { precision: 12, scale: 4 }).notNull(),
+    // La data DEL DATO corretto (es. la settimana che è stata rivista), non
+    // il momento in cui ce ne siamo accorti — quello è `detectedAt`. Stessa
+    // distinzione di recordedAt/retrievedAt nelle altre tabelle.
+    recordedAt: timestamp("recorded_at").notNull(),
+    detectedAt: timestamp("detected_at").notNull().defaultNow(),
+    source: varchar("source", { length: 64 }).notNull(),
+    // Nullable: `startFetchRun` può tornare null se `fetch_runs` non è
+    // scrivibile in quel momento (vedi fetchRunLog.ts) — la correzione va
+    // registrata comunque, solo senza il collegamento al run che l'ha vista.
+    runId: integer("run_id").references(() => fetchRuns.id),
+  },
+  (table) => ({
+    tableRecordedIdx: index("data_corrections_table_recorded_idx").on(
+      table.tableName,
+      table.recordedAt
     ),
   })
 );

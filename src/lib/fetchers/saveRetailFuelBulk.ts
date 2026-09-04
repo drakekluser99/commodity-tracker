@@ -14,6 +14,14 @@ import { regions, retailFuelPrices } from "@/lib/db/schema";
  * Vedi savePricePointsBulk per il ragionamento sui blocchi da 500: con il
  * driver `neon-http` ogni query è una richiesta HTTP, e le funzioni scritte
  * per due punti a run diventano inservibili su tremila.
+ *
+ * Come savePricePointsBulk, questa funzione NON scrive in `data_corrections`
+ * (Fase 3): un backfill riempie righe vuote, non ne corregge di esistenti,
+ * e leggere il valore precedente riga per riga prima di 27mila upsert
+ * vanificherebbe il salvataggio a blocchi. Il registro correzioni vive
+ * nella versione "cron" di queste stesse funzioni (saveEuFuelPrices.ts,
+ * saveUsFuelPrices.ts), che gestiscono decine di punti a settimana, non
+ * migliaia in un colpo solo.
  */
 const INSERT_CHUNK_SIZE = 500;
 

@@ -1,7 +1,12 @@
-import { sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { commodities, priceHistory } from "@/lib/db/schema";
 import type { NormalizedPricePoint } from "./alphaVantage";
+import {
+  logCorrectionIfChanged,
+  toNumberOrNull,
+  latestOf,
+} from "./correctionsLog";
 
 /**
  * Quante righe per singola INSERT nel salvataggio massivo.
@@ -29,12 +34,17 @@ const INSERT_CHUNK_SIZE = 500;
  */
 export async function savePricePoints(
   points: NormalizedPricePoint[],
-  source: string
+  source: string,
+  // Collega ogni correzione rilevata al run che l'ha vista (vedi
+  // data_corrections in schema.ts). Opzionale e default null: la funzione
+  // resta chiamabile anche fuori da un cron tracciato.
+  runId: number | null = null
 ) {
   // Un solo timestamp per l'intero batch: è un unico evento di
   // acquisizione. Distinto da `recordedAt` (la data del dato).
   const retrievedAt = new Date();
   let saved = 0;
+  const recordedDates: Date[] = [];
 
   for (const point of points) {
     // `onConflictDoUpdate`: se il symbol esiste già (vincolo UNIQUE nello
@@ -55,6 +65,19 @@ export async function savePricePoints(
       })
       .returning();
 
+    const recordedAt = new Date(point.date);
+
+    // Letto PRIMA dell'upsert: è l'unico modo per sapere cosa c'era prima
+    // di sovrascriverlo. Una riga in più per punto (Alpha Vantage salva
+    // poche decine di punti al giorno, non migliaia: vedi
+    // savePricePointsBulk per perché il backfill non fa questa query).
+    const existing = await db.query.priceHistory.findFirst({
+      where: and(
+        eq(priceHistory.commodityId, commodity.id),
+        eq(priceHistory.recordedAt, recordedAt)
+      ),
+    });
+
     // Upsert sul vincolo unique (commodity_id, recorded_at): se il cron
     // rigira e la fonte ripropone la stessa data, aggiorniamo il prezzo
     // (magari ricalcolato dalla fonte) invece di inserire un duplicato.
@@ -63,7 +86,7 @@ export async function savePricePoints(
       .values({
         commodityId: commodity.id,
         price: point.price.toString(), // `numeric` di Postgres si passa come stringa via Drizzle
-        recordedAt: new Date(point.date),
+        recordedAt,
         retrievedAt,
         source,
       })
@@ -74,10 +97,22 @@ export async function savePricePoints(
         set: { price: point.price.toString(), retrievedAt, source },
       });
 
+    await logCorrectionIfChanged({
+      tableName: "price_history",
+      entityLabel: point.name,
+      field: "price",
+      oldValue: toNumberOrNull(existing?.price ?? null),
+      newValue: point.price,
+      recordedAt,
+      source,
+      runId,
+    });
+
+    recordedDates.push(recordedAt);
     saved++;
   }
 
-  return saved;
+  return { saved, latestRecordedAt: latestOf(recordedDates) };
 }
 
 /**
@@ -94,6 +129,15 @@ export async function savePricePoints(
  * Non sostituisce l'altra: il cron continua a usare `savePricePoints`, che
  * è più semplice da leggere e sul suo carico di lavoro è indistinguibile.
  * Sono due funzioni perché sono due problemi.
+ *
+ * A differenza di `savePricePoints`, questa NON scrive in `data_corrections`:
+ * un backfill scrive migliaia di righe che, nella stragrande maggioranza dei
+ * casi, non esistevano prima — leggerne il valore precedente riga per riga
+ * prima di ogni upsert (come fa la versione per il cron) trasformerebbe un
+ * salvataggio a blocchi da 500 in migliaia di SELECT singole, vanificando
+ * il motivo per cui questa funzione esiste. Se un giorno servisse
+ * ricostruire le correzioni avvenute durante un backfill, è un lavoro a
+ * parte (confrontare due estrazioni), non un'aggiunta a questa funzione.
  *
  * L'upsert resta identico, e non è un dettaglio: significa che questo script
  * si può rilanciare quante volte si vuole senza duplicare nulla. Se
